@@ -1,0 +1,36 @@
+site_author: dhondta
+site_name: DSFF
+site_description: DataSet File Format (DSFF), based on XSLX
+copyright: Copyright &copy; 2021-2022 Alexandre D'Hondt
+repo_url: https://github.com/packing-box/python-dsff
+docs_dir: pages
+nav:
+  - Home: index.md
+extra:
+  generator: false
+  social:
+    - icon: fontawesome/solid/paper-plane
+      link: mailto:alexandre.dhondt@gmail.com
+      name: Contact Alex
+    - icon: fontawesome/brands/github
+      link: https://github.com/dhondta
+      name: Alex on GitHub
+    - icon: fontawesome/brands/linkedin
+      link: https://www.linkedin.com/in/alexandre-d-2ab2aa14/
+      name: Alex on LinkedIn
+    - icon: fontawesome/brands/twitter
+      link: https://twitter.com/alex_dhondt
+      name: Alex on Twitter
+theme:
+  name: material
+  palette:
+    - scheme: default
+      toggle:
+        icon: material/brightness-7 
+        name: Switch to dark mode
+    - scheme: slate
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+  logo: logo.png
+use_directory_urls: false
