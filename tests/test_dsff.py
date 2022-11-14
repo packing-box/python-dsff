@@ -11,6 +11,7 @@ class TestDsff(TestCase):
     def tearDownClass(cls):
         rmdir(TEST_BASENAME)
         rmfile(TEST)
+        rmfile("undefined.dsff")
         rmfile(TEST_BASENAME + ".arff")
         rmfile(TEST_BASENAME + ".csv")
     
