@@ -113,11 +113,8 @@ def to_arff(dsff, path=None, target=TARGET_NAME, exclude=DEFAULT_EXCL, missing=M
             mlen_h = max(mlen_h, len(header))
         break
     # filter headers on the relevant data
-    try:
-        headers = [h for k, h in enumerate(headers) if k != i_target and k not in h_excl] + \
-                  [headers[i_target] if i_target > -1 else []]
-    except UnboundLocalError:
-        raise ValueError("Empty dataset")
+    headers = [h for k, h in enumerate(headers) if k != i_target and k not in h_excl] + \
+              [headers[i_target] if i_target > -1 else []]
     # format the data according to the ARFF format
     dsff.logger.debug("> computing data...")
     types = []

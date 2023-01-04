@@ -5,6 +5,7 @@ import openpyxl.reader.excel as excelr
 import types
 from ast import literal_eval
 from datetime import datetime
+from functools import wraps
 from getpass import getuser
 from openpyxl import load_workbook, Workbook
 from openpyxl.styles import Alignment, Font
@@ -20,10 +21,33 @@ from .dataset import *
 __all__ = ["DSFF"]
 
 
-for name, etype in [("BadDsffFile", "OSError"), ("BadInputData", "ValueError")]:
+for name, etype in [("BadDsffFile", "OSError"), ("BadInputData", "ValueError"), ("EmptyDsffFile", "ValueError")]:
     if not hasattr(builtins, name):
         exec("class %s(%s): __module__ = 'builtins'" % (name, etype))
         setattr(builtins, name, locals()[name])
+
+
+def _bind_from(dsff):
+    def _adapt_name(f):
+        def _wrapper(path, *args, **kwargs):
+            r = f(dsff, path, *args, **kwargs)
+            if dsff.name == INMEMORY:
+                dsff.name = splitext(basename(path))[0]
+            return r
+        setattr(dsff, f.__name__, _wrapper)
+        return _wrapper
+    return _adapt_name
+
+
+def _bind_to(dsff):
+    def _is_empty(f):
+        def _wrapper(*args, **kwargs):
+            if len(dsff) == 0:
+                raise EmptyDsffFile("No data")
+            return f(dsff, *args, **kwargs)
+        setattr(dsff, f.__name__, _wrapper)
+        return _wrapper
+    return _is_empty
 
 
 class DSFF:
@@ -38,38 +62,38 @@ class DSFF:
     """
     def __init__(self, path=None, mode=None, logger=None):
         if mode is None:
-            mode = "rw"[path is None]
+            mode = "rw"[path in [None, INMEMORY]]
         if re.match(r"[rw]\+?$", mode) is None:
             raise ValueError("Mode should be one of: r, r+, w, w+")
         self.__change = False
         self.__logger = logger or logging.getLogger("DSFF")
+        self.__name = None
         self.__path = path
         self.__mode = mode
         # depending on the mode, bind the necessary methods
         if mode in ["r+", "w", "w+"]:
-            self.logger.debug("binding write methods")
-            for name, obj in globals().items():
-                if name.startswith("from_"):
-                    setattr(self, name, types.MethodType(obj, self))
             self.save = types.MethodType(lambda dsff: dsff._DSFF__save(), self)
-        if mode in ["r", "r+", "w+"]:
-            self.logger.debug("binding read methods")
-            for name, obj in globals().items():
-                if name.startswith("to_"):
-                    setattr(self, name, types.MethodType(obj, self))
+        self.logger.debug("binding write methods")
+        for name, obj in globals().items():
+            if name.startswith("from_"):
+                _bind_from(self)(obj)
+        self.logger.debug("binding read methods")
+        for name, obj in globals().items():
+            if name.startswith("to_"):
+                _bind_to(self)(obj)
         # perform checks
         if mode in ["r", "r+"]:
             if path is None:
                 raise ValueError("No input path to a .dsff file provided")
-            if not isfile(self.path):
+            if path != INMEMORY and not isfile(path):
                 raise FileNotFoundError("Input .dsff does not exist")            
         # if the target path exists and is a file, open it
-        if mode in ["r", "r+"]:
+        if mode in ["r", "r+"] and path != INMEMORY:
             # disable archive validation as it does not recognize '.dsff'
             tmp = excelr._validate_archive
             excelr._validate_archive = lambda f: ZipFile(f, 'r')
             try:
-                self.__wb = load_workbook(self.path)
+                self.__wb = load_workbook(path)
             except BadZipFile:
                 raise BadDsffFile("File is not a DSFF file")
             finally:
@@ -84,7 +108,7 @@ class DSFF:
                 break
             return
         # otherwise, create a new workbook with the default worksheets
-        if self.path is not None and isfile(self.path):
+        if isfile(self.path):
             remove(self.path)  # re-create
         self.__wb = Workbook()
         del self.__wb['Sheet']  # remove the default sheet
@@ -110,6 +134,9 @@ class DSFF:
             pass
         return self.metadata[name]
     
+    def __len__(self):
+        return len(self.data)
+    
     def __setitem__(self, name, value):
         if name in ["data", "features"]:
             raise ValueError("'%s' is a name reserved for a worksheet" % name)
@@ -128,7 +155,7 @@ class DSFF:
             return v
     
     def __save(self):
-        if self.mode == "r":
+        if self.mode == "r" or self.path == INMEMORY:
             return
         if self.__change:
             props = self.__wb.properties
@@ -253,12 +280,16 @@ class DSFF:
     
     @property
     def name(self):
-        return self.__wb.properties.title or splitext(basename(self.path))[0]
+        return self.__name or self.__wb.properties.title or splitext(basename(self.path))[0]
+    
+    @name.setter
+    def name(self, name):
+        self.__name = name
     
     @property
     def path(self):
         p = self.__path or "undefined"
-        if not p.endswith(".dsff"):
+        if p != INMEMORY and not p.endswith(".dsff"):
             p += ".dsff"
         return p
 

@@ -5,7 +5,7 @@ import random
 import zipfile
 from datetime import datetime
 from dsff import DSFF, BadDsffFile, BadInputData
-from dsff.__common__ import MISSING_TOKEN
+from dsff.__common__ import INMEMORY, MISSING_TOKEN
 from openpyxl.worksheet.worksheet import Worksheet
 from unittest import TestCase
 

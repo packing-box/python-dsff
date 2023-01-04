@@ -24,26 +24,6 @@ class TestDsff(TestCase):
         self.assertRaises(ValueError, DSFF, None, "r")
         self.assertRaises(ValueError, DSFF, None, "r+")
         self.assertRaises(FileNotFoundError, DSFF, BAD)
-        # bound methods in function of the operation mode
-        create_test_dsff()
-        f = DSFF(TEST, "w")
-        self.assertTrue(any(n.startswith("from_") for n in f.__dict__))
-        self.assertFalse(any(n.startswith("to_") for n in f.__dict__))
-        f.close()
-        f = DSFF(TEST, "w+")
-        self.assertTrue(any(n.startswith("from_") for n in f.__dict__))
-        self.assertTrue(any(n.startswith("to_") for n in f.__dict__))
-        f.close()
-        self.assertFalse(os.path.exists(TEST))  # was removed by 'w+?' modes
-        create_test_dsff()
-        f = DSFF(TEST, "r")
-        self.assertTrue(any(n.startswith("to_") for n in f.__dict__))
-        self.assertFalse(any(n.startswith("from_") for n in f.__dict__))
-        f.close()
-        f = DSFF(TEST, "r+")
-        self.assertTrue(any(n.startswith("to_") for n in f.__dict__))
-        self.assertTrue(any(n.startswith("from_") for n in f.__dict__))
-        f.close()
     
     def test_dsff_format(self):
         # not a DSFF file
@@ -174,4 +154,14 @@ class TestDsff(TestCase):
         with DSFF() as f:
             self.assertRaises(BadInputData, f.from_dataset, TEST_BASENAME)
         os.remove(TEST_BASENAME)
+    
+    def test_in_memory(self):
+        create_test_dsff()
+        with DSFF(TEST) as f:
+            self.assertIsNone(f.to_dataset())
+        with DSFF(INMEMORY) as f:
+            self.assertRaises(EmptyDsffFile, f.to_arff)
+            self.assertIsNone(f.from_dataset(TEST_BASENAME))
+            self.assertIsNone(f.to_arff())
+        rmdir(TEST_BASENAME)
 
