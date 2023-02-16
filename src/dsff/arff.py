@@ -49,10 +49,9 @@ def from_arff(dsff, path=None, target=TARGET_NAME, missing=MISSING_TOKEN):
                     if header == "class":
                         header = target
                     d[0].append(header)
+                    continue
                 except AttributeError:
                     raise BadInputData("Line %d: failed on @ATTRIBUTE (bad type)" % n)
-                finally:
-                    continue
             if not data:
                 if l == "@DATA":
                     data = True
