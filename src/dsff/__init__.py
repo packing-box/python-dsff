@@ -13,6 +13,7 @@ from openpyxl.utils import get_column_letter
 from zipfile import BadZipFile, ZipFile
 
 from .__common__ import *
+from .__info__ import __author__, __copyright__, __license__, __version__
 from .arff import *
 from .csv import *
 from .dataset import *

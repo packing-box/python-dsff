@@ -1,0 +1,45 @@
+[build-system]
+requires = ["setuptools>=61.0", "setuptools-scm"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.dynamic]
+version = {attr = "dsff.__info__.__version__"}
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[project]
+name = "dsff"
+authors = [
+  {name="Alexandre D'Hondt", email="alexandre.dhondt@gmail.com"},
+]
+description = "DataSet File Format (DSFF)"
+license = {file = "LICENSE"}
+keywords = ["python", "programming", "dataset-file-format", "dsff"]
+requires-python = ">=3.7,<4"
+classifiers = [
+  "Development Status :: 5 - Production/Stable",
+  "Environment :: Console",
+  "Intended Audience :: Developers",
+  "License :: OSI Approved :: GNU General Public License v3 or later (GPLv3+)",
+  "Programming Language :: Python :: 3.7",
+  "Programming Language :: Python :: 3.8",
+  "Programming Language :: Python :: 3.9",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Topic :: Software Development :: Libraries :: Python Modules",
+]
+dependencies = [
+  "openpyxl",
+]
+dynamic = ["version"]
+
+[project.readme]
+file = "README.md"
+content-type = "text/markdown"
+
+[project.urls]
+documentation = "https://python-dsff.readthedocs.io/en/latest/?badge=latest"
+homepage = "https://github.com/packing-box/python-dsff"
+issues = "https://github.com/packing-box/python-dsff/issues"
+repository = "https://github.com/packing-box/python-dsff"
