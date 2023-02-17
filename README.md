@@ -4,6 +4,8 @@
 
 [![PyPi](https://img.shields.io/pypi/v/dsff.svg)](https://pypi.python.org/pypi/dsff/)
 [![Read The Docs](https://readthedocs.org/projects/python-dsff/badge/?version=latest)](https://python-dsff.readthedocs.io/en/latest/?badge=latest)
+[![Build Status](https://github.com/packing-box/python-dsff/actions/workflows/python-package.yml/badge.svg)](https://github.com/dhondta/python-dsff/actions/workflows/python-package.yml)
+[![Coverage Status](https://raw.githubusercontent.com/packing-box/python-dsff/main/docs/coverage.svg)](#)
 [![Python Versions](https://img.shields.io/pypi/pyversions/dsff.svg)](https://pypi.python.org/pypi/dsff/)
 [![Known Vulnerabilities](https://snyk.io/test/github/packing-box/python-dsff/badge.svg?targetFile=requirements.txt)](https://snyk.io/test/github/packing-box/python-dsff?targetFile=requirements.txt)
 [![License](https://img.shields.io/pypi/l/dsff.svg)](https://pypi.python.org/pypi/dsff/)
@@ -41,9 +43,13 @@ pip install --user dsff
 You may also like these:
 
 - [Awesome Executable Packing](https://github.com/packing-box/awesome-executable-packing): A curated list of awesome resources related to executable packing.
+- [Bintropy](https://github.com/packing-box/bintropy): Analysis tool for estimating the likelihood that a binary contains compressed or encrypted bytes (inspired from [this paper](https://ieeexplore.ieee.org/document/4140989)).
 - [Dataset of packed ELF files](https://github.com/packing-box/dataset-packed-elf): Dataset of ELF samples packed with many different packers.
-- [Dataset of packed PE files](https://github.com/packing-box/dataset-packed-pe): Dataset of PE samples packed with many different packers.
+- [Dataset of packed PE files](https://github.com/packing-box/dataset-packed-pe): Dataset of PE samples packed with many different packers (fork of [this repository](https://github.com/chesvectain/PackingData)).
 - [Docker Packing Box](https://github.com/packing-box/docker-packing-box): Docker image gathering packers and tools for making datasets of packed executables.
+- [PEiD](https://github.com/packing-box/peid): Python implementation of the well-known Packed Executable iDentifier ([PEiD](https://www.aldeid.com/wiki/PEiD)).
+- [PyPackerDetect](https://github.com/packing-box/pypackerdetect): Packing detection tool for PE files (fork of [this repository](https://github.com/cylance/PyPackerDetect)).
+- [REMINDer](https://github.com/packing-box/reminder): Packing detector using a simple heuristic (inspired from [this paper](https://ieeexplore.ieee.org/document/5404211)).
 
 
 ## :clap:  Supporters
