@@ -33,12 +33,14 @@ theme:
       toggle:
         icon: material/brightness-4
         name: Switch to light mode
-  logo: logo.png
+  logo: imgs/logo.png
 use_directory_urls: false
 markdown_extensions:
   - admonition
-  - pymdownx.highlight:
-      anchor_linenums: true
+  - codehilite:
+      linenums: true
+  - pymdownx.details
+  - pymdownx.superfences
   - tables
   - toc:
       permalink: true
