@@ -6,9 +6,9 @@ __all__ = ["from_dataset", "to_dataset"]
 
 
 def from_dataset(dsff, path=None):
-    """ Populate the DSFF file from an ARFF file. """
-    path = expanduser(path or dsff.name)
-    dsff.logger.debug("creating DSFF from (Fileless)Dataset folder...")
+    """ Populate the DSFF file from a Dataset structure. """
+    path = fix_path(dsff, path)
+    dsff.logger.debug(f"creating DSFF from {path}...")
     if not isdir(path):
         raise BadInputData("Not a folder")
     else:
@@ -28,9 +28,9 @@ def to_dataset(dsff, path=None):
      +-- features.json
      +-- metadata.json
     """
-    path = splitext(expanduser(path or dsff.name))[0]
+    path = fix_path(dsff, path, split=True)
     makedirs(path, exist_ok=True)
-    dsff.logger.debug("converting DSFF to (Fileless)Dataset folder...")
+    dsff.logger.debug(f"converting DSFF to (Fileless)Dataset {path}...")
     # handle data first
     dsff.logger.debug("> making data.csv...")
     with open(join(path, "data.csv"), 'w+') as f:

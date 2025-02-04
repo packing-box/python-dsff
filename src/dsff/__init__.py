@@ -17,6 +17,7 @@ from .__info__ import __author__, __copyright__, __license__, __version__
 from .arff import *
 from .csv import *
 from .dataset import *
+from .db import *
 
 
 __all__ = ["DSFF"]
@@ -24,7 +25,7 @@ __all__ = ["DSFF"]
 
 for name, etype in [("BadDsffFile", "OSError"), ("BadInputData", "ValueError"), ("EmptyDsffFile", "ValueError")]:
     if not hasattr(builtins, name):
-        exec("class %s(%s): __module__ = 'builtins'" % (name, etype))
+        exec(f"class {name}({etype}): __module__ = 'builtins'")
         setattr(builtins, name, locals()[name])
 
 
@@ -140,7 +141,7 @@ class DSFF:
     
     def __setitem__(self, name, value):
         if name in ["data", "features"]:
-            raise ValueError("'%s' is a name reserved for a worksheet" % name)
+            raise ValueError(f"'{name}' is a name reserved for a worksheet")
         # see the note from __getitem__ related to 'description'
         if hasattr(self.__wb.properties, name) and name != "description":
             setattr(self.__wb.properties, name, value)
@@ -242,7 +243,7 @@ class DSFF:
                 autoadjust(ws)
                 self.__change = True
             except Exception as e:
-                raise BadInputData("Unexpected error while parsing 'features' (%s)" % e)
+                raise BadInputData(f"Unexpected error while parsing 'features' ({e})")
         # finally handle metadata dictionary
         if metadata is not None:
             self.__logger.debug("writing metadata to DSFF...")
@@ -255,8 +256,9 @@ class DSFF:
                     raise BadInputData("'metadata' is not a dictionary")
             try:
                 self.__wb.properties.description = json.dumps(d)
+                self.__change = True
             except Exception as e:
-                raise BadInputData("Unexpected error while parsing 'metadata' (%s)" % e)
+                raise BadInputData(f"Unexpected error while parsing 'metadata' ({e})")
         self.__save()
     
     @property

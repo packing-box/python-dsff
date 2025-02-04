@@ -5,7 +5,7 @@ This library contains the `DSFF` class that can:
 - Behave as a context manager
 - Have items got (`data` and `features` return the related worksheets) or set (for setting, in order of precedence, standard XSLX properties and metadata contained in the `description` property)
 - Write data, features and metadata
-- Convert to the [ARFF](https://www.cs.waikato.ac.nz/ml/weka/arff.html) (for use with the [Weka](https://www.cs.waikato.ac.nz/ml/weka) framework) or [CSV](https://www.rfc-editor.org/rfc/rfc4180) formats or to a [FilelessDataset structure](https://docker-packing-box.readthedocs.io/en/latest/usage/datasets.html) (from the [Packing Box](https://github.com/packing-box/docker-packing-box))
+- Convert to the [ARFF](https://www.cs.waikato.ac.nz/ml/weka/arff.html) (for use with the [Weka](https://www.cs.waikato.ac.nz/ml/weka) framework), [CSV](https://www.rfc-editor.org/rfc/rfc4180) or [SQLite DB](https://www.sqlite.org/fileformat.html) formats or to a [FilelessDataset structure](https://docker-packing-box.readthedocs.io/en/latest/usage/datasets.html) (from the [Packing Box](https://github.com/packing-box/docker-packing-box))
 
 -----
 
@@ -64,6 +64,14 @@ Converting from other formats to DSFF |  Converting from DSFF to other formats
 >>> import dsff
 >>> with dsff.DSFF("my-dataset.dsff") as f:
     f.to_csv()  # creates ./my-dataset.csv
+```
+
+**Creating a [SQLDB](https://www.sqlite.org/fileformat.html) file from a DSFF**
+
+```python
+>>> import dsff
+>>> with dsff.DSFF("my-dataset.dsff") as f:
+    f.to_db()  # creates ./my-dataset.db
 ```
 
 **Creating a FilelessDataset from a DSFF**

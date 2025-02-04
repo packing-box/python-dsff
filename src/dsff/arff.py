@@ -7,10 +7,8 @@ __all__ = ["from_arff", "to_arff"]
 
 def from_arff(dsff, path=None, target=TARGET_NAME, missing=MISSING_TOKEN):
     """ Populate the DSFF file from an ARFF file. """
-    path = expanduser(path or dsff.name)
-    if not path.endswith(".arff"):
-        path += ".arff"
-    dsff.logger.debug("creating DSFF from ARFF file...")
+    path = fix_path(dsff, path, ".arff")
+    dsff.logger.debug(f"creating DSFF from {path}...")
     d = []
     with open(path) as f:
         relation, attributes, data = False, [False, False], False
@@ -87,11 +85,9 @@ def from_arff(dsff, path=None, target=TARGET_NAME, missing=MISSING_TOKEN):
 def to_arff(dsff, path=None, target=TARGET_NAME, exclude=DEFAULT_EXCL, missing=MISSING_TOKEN, text=False):
     """ Output the dataset in ARFF format, suitable for use with the Weka framework, saved as a file or output as a
          string. """
-    path = splitext(expanduser(path or dsff.name))[0]
-    if not path.endswith(".arff"):
-        path += ".arff"
+    path = fix_path(dsff, path, ".arff", True)
     name = splitext(basename(path))[0]
-    dsff.logger.debug("extracting data from DSFF to ARFF file...")
+    dsff.logger.debug(f"extracting data from DSFF to {[path,'ARFF'][text]}...")
     _d = lambda c: {None: missing, '': "-", 'False': "0", 'True': "1"}.get(c.value, c.value)
     _sanitize_n = lambda c: _d(c).replace("<", "[lt]").replace(">", "[gt]")
     _sanitize_v = lambda c: _d(c)[1:].strip("\"'") if _d(c).startswith("=") else _d(c)
@@ -119,33 +115,34 @@ def to_arff(dsff, path=None, target=TARGET_NAME, exclude=DEFAULT_EXCL, missing=M
     types = []
     # parse labels, data types and relevant data
     for i, row in enumerate(data.rows):
-        if i > 0:
-            if len(types) == 0:
-                labels = ["0", "1"] if i_target == -1 else \
-                         list(set(_sanitize_v(row[i_target]) for k, row in enumerate(data) if k > 0))
-                labels = [x for x in labels if x != missing]
-                # compute types
-                for j, cell in enumerate(row):
-                    v = _sanitize_v(cell)
-                    try:
-                        float(v)
-                        t = "NUMERIC"
-                    except ValueError:
-                        t = "STRING"
-                    types.append(t)
-                # filter data types based on the relevant columns
-                types = [t for k, t in enumerate(types) if k != i_target and k not in h_excl] + \
-                        [types[i_target] if i_target > -1 else []]
-                # compute the list of ARFF attribute lines based on the column names and data types
-                a = [("@ATTRIBUTE {: <%s} {}" % mlen_h).format("class" if j == len(types)-1 else \
-                      _sanitize_n(headers[j]), t) for j, t in enumerate(types)]
-                mlen_c = [0] * len(types)
-            # filter data based on the relevant columns
-            row = [_sanitize_v(x) for k, x in enumerate(row) if k != i_target and k not in h_excl] + \
-                  ([_sanitize_v(row[i_target])] if i_target > -1 else [])
-            # compute the maximum length for each column
-            mlen_c = [max(x, len(row[k]) if types[k] == "NUMERIC" else len(row[k])+2) for k, x in enumerate(mlen_c)]
-            d.append(row)
+        if i == 0:
+            continue  # do not process headers
+        if len(types) == 0:
+            labels = ["0", "1"] if i_target == -1 else \
+                     list(set(_sanitize_v(row[i_target]) for k, row in enumerate(data) if k > 0))
+            labels = [x for x in labels if x != missing]
+            # compute types
+            for j, cell in enumerate(row):
+                v = _sanitize_v(cell)
+                try:
+                    float(v)
+                    t = "NUMERIC"
+                except ValueError:
+                    t = "STRING"
+                types.append(t)
+            # filter data types based on the relevant columns
+            types = [t for k, t in enumerate(types) if k != i_target and k not in h_excl] + \
+                    [types[i_target] if i_target > -1 else []]
+            # compute the list of ARFF attribute lines based on the column names and data types
+            a = [("@ATTRIBUTE {: <%s} {}" % mlen_h).format("class" if j == len(types)-1 else \
+                  _sanitize_n(headers[j]), t) for j, t in enumerate(types)]
+            mlen_c = [0] * len(types)
+        # filter data based on the relevant columns
+        row = [_sanitize_v(x) for k, x in enumerate(row) if k != i_target and k not in h_excl] + \
+              ([_sanitize_v(row[i_target])] if i_target > -1 else [])
+        # compute the maximum length for each column
+        mlen_c = [max(x, len(row[k]) if types[k] == "NUMERIC" else len(row[k])+2) for k, x in enumerate(mlen_c)]
+        d.append(row)
     # format the resulting data and output the ARFF
     d = "\n".join(" ".join(("{: <%s}" % (mlen_c[k]+1)).format((x if types[k] == "NUMERIC" or x == MISSING_TOKEN else \
                             "'%s'" % x) + ",") for k, x in enumerate(row)).rstrip(" ,") for row in d)
