@@ -27,6 +27,7 @@ pip install --user dsff
     f.write("/path/to/my-dataset")  # folder of a FilelessDataset (containing data.csv, features.json and metadata.json)
     f.to_arff()                     # creates ./my-dataset.arff
     f.to_csv()                      # creates ./my-dataset.csv
+    f.to_db()                       # creates ./my-dataset.db (SQLite DB)
 # while leaving the context, ./my-dataset.dsff is created
 ```
 
