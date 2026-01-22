@@ -9,14 +9,18 @@ def from_arff(dsff, path=None, target=TARGET_NAME, missing=MISSING_TOKEN):
     """ Populate the DSFF file from an ARFF file. """
     path = fix_path(dsff, path, ".arff")
     dsff.logger.debug(f"creating DSFF from {path}...")
-    d = []
+    d, features = [], {}
     with open(path) as f:
         relation, attributes, data = False, [False, False], False
         for n, l in enumerate(f, 1):
             l = l.strip()
-            # ignore comments before @RELATION
-            if l.startswith("#"):
-                continue
+            # get metadata and feature descriptions from comments
+            if l.startswith("%"):
+                if (m := re.match(r"^\%\s+(.*?)\s*\:\s*(.*?)$", l)):
+                    name, descr = m.groups()
+                    features[name] = descr
+                elif re.match(r"^\%\d+metadata\s*\:\s*\{.*\}$"):
+                    dsff.write(metadata=literal_eval(l.split(":", 1)))
             if not relation:
                 if l.startswith("@RELATION "):
                     relation = True
@@ -73,12 +77,7 @@ def from_arff(dsff, path=None, target=TARGET_NAME, missing=MISSING_TOKEN):
             for j, row in enumerate(d):
                 if j > 0:
                     row[i] = {'0': "False", '1': "True"}[row[i]]
-    dsff.write(d)
-    features = {}
-    for headers in dsff['data'].rows:
-        for header in headers:
-            features[header.value] = ""
-        break
+    dsff.write(data=d)
     dsff.write(features=features)
 
 
@@ -144,9 +143,11 @@ def to_arff(dsff, path=None, target=TARGET_NAME, exclude=DEFAULT_EXCL, missing=M
         mlen_c = [max(x, len(row[k]) if types[k] == "NUMERIC" else len(row[k])+2) for k, x in enumerate(mlen_c)]
         d.append(row)
     # format the resulting data and output the ARFF
-    d = "\n".join(" ".join(("{: <%s}" % (mlen_c[k]+1)).format((x if types[k] == "NUMERIC" or x == MISSING_TOKEN else \
-                            "'%s'" % x) + ",") for k, x in enumerate(row)).rstrip(" ,") for row in d)
-    arff = "@RELATION \"{}\"\n\n{}\n\n@DATA\n{}".format(name, "\n".join(a), d)
+    d = (nl := "\n").join(" ".join(("{: <%s}" % (mlen_c[k]+1)).format((x if types[k] == "NUMERIC" or \
+                       x == MISSING_TOKEN else "'%s'" % x) + ",") for k, x in enumerate(row)).rstrip(" ,") for row in d)
+    arff = f"@RELATION \"{name}\"\n\n{nl.join(a)}\n\n@DATA\n{d}\n\n" \
+           f"{['', f'% metadata: {json.dumps(dsff.metadata)}'][len(dsff.metadata) > 0]}\n\n" \
+           f"{nl.join(f'% {name}: {descr}' for name, descr in dsff.features.items())}"
     if text:
         return arff
     with open(path, 'w+') as f:
