@@ -12,12 +12,8 @@ def from_dataset(dsff, path=None):
     if not isdir(path):
         raise BadInputData("Not a folder")
     else:
-        missing = []
-        for f in ["data.csv", "features.json", "metadata.json"]:
-            if not isfile(join(path, f)):
-                missing.append(f)
-        if len(missing) > 0:
-            raise BadInputData("Not a valid dataset folder (missing: %s)" % ", ".join(missing))
+        if len(missing := [f for f in ["data.csv", "features.json", "metadata.json"] if not isfile(join(path, f))]) > 0:
+            raise BadInputData(f"Not a valid dataset folder (missing: {', '.join(missing)})")
     dsff.write(path)
 
 

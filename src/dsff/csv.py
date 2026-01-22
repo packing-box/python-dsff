@@ -13,6 +13,8 @@ def from_csv(dsff, path=None, exclude=DEFAULT_EXCL):
     features = {}
     for headers in dsff['data'].rows:
         for header in headers:
+            if header.value in exclude:
+                continue
             features[header.value] = ""
         break
     dsff.write(features=features)
@@ -24,8 +26,8 @@ def to_csv(dsff, path=None, text=False):
     dsff.logger.debug(f"extracting data from DSFF to {[path,'CSV'][text]}...")
     with (StringIO() if text else open(path, 'w+')) as f:
         writer = csvmod.writer(f, delimiter=";")
-        for cells in dsff['data'].rows:
-            writer.writerow([dsff._DSFF__eval(c.value) for c in cells])
+        for row in dsff.data:
+            writer.writerow(row)
         if text:
             return f.getvalue()
 
