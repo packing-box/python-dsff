@@ -7,8 +7,6 @@ __all__ = ["from_dataset", "to_dataset"]
 
 def from_dataset(dsff, path=None):
     """ Populate the DSFF file from a Dataset structure. """
-    path = fix_path(dsff, path)
-    dsff.logger.debug(f"creating DSFF from {path}...")
     if not isdir(path):
         raise BadInputData("Not a folder")
     else:
@@ -18,15 +16,13 @@ def from_dataset(dsff, path=None):
 
 
 def to_dataset(dsff, path=None):
-    """ Create a dataset folder according to the Dataset structure ;
+    """ Create a dataset folder according to the following structure ;
     name
      +-- data.csv
      +-- features.json
      +-- metadata.json
     """
-    path = fix_path(dsff, path, split=True)
     makedirs(path, exist_ok=True)
-    dsff.logger.debug(f"converting DSFF to (Fileless)Dataset {path}...")
     # handle data first
     dsff.logger.debug("> making data.csv...")
     with open(join(path, "data.csv"), 'w+') as f:

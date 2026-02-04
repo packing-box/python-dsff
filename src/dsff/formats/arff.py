@@ -7,20 +7,12 @@ __all__ = ["from_arff", "to_arff"]
 
 def from_arff(dsff, path=None, target=TARGET_NAME, missing=MISSING_TOKEN):
     """ Populate the DSFF file from an ARFF file. """
-    path = fix_path(dsff, path, ".arff")
-    dsff.logger.debug(f"creating DSFF from {path}...")
     d, features = [], {}
     with open(path) as f:
         relation, attributes, data = False, [False, False], False
         for n, l in enumerate(f, 1):
-            l = l.strip()
-            # get metadata and feature descriptions from comments
-            if l.startswith("%"):
-                if (m := re.match(r"^\%\s+(.*?)\s*\:\s*(.*?)$", l)):
-                    name, descr = m.groups()
-                    features[name] = descr
-                elif re.match(r"^\%\d+metadata\s*\:\s*\{.*\}$"):
-                    dsff.write(metadata=literal_eval(l.split(":", 1)))
+            l, pf = l.strip(), f"Line {n}: "
+            # the file shall start with "@RELATION"
             if not relation:
                 if l.startswith("@RELATION "):
                     relation = True
@@ -28,9 +20,17 @@ def from_arff(dsff, path=None, target=TARGET_NAME, missing=MISSING_TOKEN):
                         dsff['title'] = re.match(r"@RELATION\s+('[^']*'|\"[^\"]*\")$", l).group(1).strip("'\"")
                         continue
                     except Exception as e:
-                        raise BadInputData("Line %d: failed on @RELATION (%s)" % (n, e))
+                        raise BadInputData(f"{pf}failed on @RELATION ({e})")
                 else:
-                    raise BadInputData("Line %d: did not find @RELATION" % n)
+                    raise BadInputData(f"{pf}did not find @RELATION")
+            # get metadata and feature descriptions from comments
+            if l.startswith("%"):
+                if re.match(r"^\%\s+metadata\s*\:\s*\{.*\}$", l):
+                    dsff.write(metadata=literal_eval(l.split(":", 1)[1]))
+                elif (m := re.match(r"^\%\s+(.*?)\s*\:\s*(.*?)$", l)):
+                    name, descr = m.groups()
+                    features[name] = descr
+                continue
             # then ignore blank lines
             if l == "":
                 if attributes[0] and not attributes[1]:
@@ -45,7 +45,7 @@ def from_arff(dsff, path=None, target=TARGET_NAME, missing=MISSING_TOKEN):
                     # start the attributes block
                     d.append([])
                 if attributes[1]:
-                    raise BadInputData("Line %d: found @ATTRIBUTE out of the attributes block)" % n)
+                    raise BadInputData(f"{pf}found @ATTRIBUTE out of the attributes block)")
                 try:
                     header = re.match(r"@ATTRIBUTE\s+([^\s]+)\s+[A-Z]+$", l).group(1)
                     if header == "class":
@@ -53,16 +53,16 @@ def from_arff(dsff, path=None, target=TARGET_NAME, missing=MISSING_TOKEN):
                     d[0].append(header)
                     continue
                 except AttributeError:
-                    raise BadInputData("Line %d: failed on @ATTRIBUTE (bad type)" % n)
+                    raise BadInputData(f"{pf}failed on @ATTRIBUTE (bad type)")
             if not data:
                 if l == "@DATA":
                     data = True
                     continue
                 else:
-                    raise BadInputData("Line %d: did not find @DATA where expected" % n)
+                    raise BadInputData(f"{pf}did not find @DATA where expected")
             row = list(map(lambda x: x.strip("'\""), re.split(r",\s+", l)))
             if len(row) != n_cols:
-                raise BadInputData("Line %d: this row does not match the number of columns" % n)
+                raise BadInputData(f"{pf}this row does not match the number of columns")
             d.append(row)
     for i in range(n_cols):
         values = []
@@ -84,9 +84,7 @@ def from_arff(dsff, path=None, target=TARGET_NAME, missing=MISSING_TOKEN):
 def to_arff(dsff, path=None, target=TARGET_NAME, exclude=DEFAULT_EXCL, missing=MISSING_TOKEN, text=False):
     """ Output the dataset in ARFF format, suitable for use with the Weka framework, saved as a file or output as a
          string. """
-    path = fix_path(dsff, path, ".arff", True)
     name = splitext(basename(path))[0]
-    dsff.logger.debug(f"extracting data from DSFF to {[path,'ARFF'][text]}...")
     _d = lambda c: {None: missing, '': "-", 'False': "0", 'True': "1"}.get(c.value, c.value)
     _sanitize_n = lambda c: _d(c).replace("<", "[lt]").replace(">", "[gt]")
     _sanitize_v = lambda c: _d(c)[1:].strip("\"'") if _d(c).startswith("=") else _d(c)

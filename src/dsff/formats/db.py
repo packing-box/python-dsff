@@ -9,14 +9,12 @@ def from_db(dsff, path=None, exclude=DEFAULT_EXCL):
     """ Populate the DSFF file from a SQLDB file. """
     from json import loads
     from sqlite3 import connect
-    path = fix_path(dsff, path, ".db")
-    dsff.logger.debug(f"creating DSFF from {path}...")
     conn = connect(path)
     cursor = conn.cursor()
     # list tables
     cursor.execute("SELECT name FROM sqlite_master WHERE type='table';")
     tables = [table[0] for table in cursor.fetchall()]
-    if not all(t in tables for t in ["data", "features", "metadata"]):
+    if not all(t in tables for t in ["data", "features", "metadata"]):  # pragma: no cover
         raise BadInputData("The target SQLDB does not have the right format")
     # import data
     cursor.execute("PRAGMA table_info('data')")
@@ -36,8 +34,6 @@ def to_db(dsff, path=None, text=False, primary_index=0):
     """ Create a SQLDB from the data worksheet, saved as a file or output as a string. """
     from json import dumps
     from sqlite3 import connect
-    path = fix_path(dsff, path, ".db", True)
-    dsff.logger.debug(f"extracting data from DSFF to {[path,'SQL'][text]}...")
     fields = []
     rows = (data := dsff['data']).rows
     headers, first = [c.value for c in next(rows)], next(rows)
