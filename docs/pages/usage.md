@@ -82,3 +82,27 @@ Converting from other formats to DSFF |  Converting from DSFF to other formats
     f.to_dataset()  # creates ./[dsff-title] with data.csv, features.json and metadata.json
 ```
 
+**Creating a Feather dataset from a DSFF**
+
+```python
+>>> import dsff
+>>> with dsff.DSFF("/path/to/my-dataset.feather") as f:
+    f.to_feather()  # creates ./my-dataset.feather
+```
+
+**Creating an ORC dataset from a DSFF**
+
+```python
+>>> import dsff
+>>> with dsff.DSFF("/path/to/my-dataset.orc") as f:
+    f.to_orc()  # creates ./my-dataset.orc
+```
+
+**Creating a Parquet dataset from a DSFF**
+
+```python
+>>> import dsff
+>>> with dsff.DSFF("/path/to/my-dataset.parquet") as f:
+    f.to_parquet()  # creates ./my-dataset.parquet
+```
+

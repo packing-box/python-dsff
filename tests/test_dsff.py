@@ -12,8 +12,8 @@ class TestDsff(TestCase):
         rmdir(TEST_BASENAME)
         rmfile(TEST)
         rmfile("undefined.dsff")
-        rmfile(TEST_BASENAME + ".arff")
-        rmfile(TEST_BASENAME + ".csv")
+        for ext in [".arff", ".csv", ".db"]:
+            rmfile(TEST_BASENAME + ext)
     
     def tearDown(self):
         rmfile(TEST)
@@ -90,40 +90,37 @@ class TestDsff(TestCase):
             f.write(TEST_ARFF)
         with DSFF() as f:
             f.from_arff(TEST_BASENAME)
-        #  use a bad ARFF without the @RELATION line
+        # test for multiple error scenarios
         with open(arff) as f:
             d = f.read().splitlines(True)
-        d[0] = "@RELATION BAD:NO_QUOTE\n"
-        d.remove(d[1])
-        with open(arff, 'w') as f:
-            f.writelines(d)
-        with DSFF() as f:
-            self.assertRaises(BadInputData, f.from_arff, TEST_BASENAME)
+        @contextmanager
+        def _test():
+            yield d
+            with open(arff, 'w') as f:
+                f.writelines(d)
+            with DSFF() as f:
+                self.assertRaises(BadInputData, f.from_arff, TEST_BASENAME)
         #  use a bad ARFF without the @RELATION line
-        with open(arff, 'w') as f:
-            f.writelines(d[1:])
-        with DSFF() as f:
-            self.assertRaises(BadInputData, f.from_arff, TEST_BASENAME)
-        d[0] = "@RELATION 'example-dataset'\n"
+        with _test():
+            d[0] = "@RELATION BAD:NO_QUOTE\n"
+            d.remove(d[1])
+        #  use a bad ARFF without the @RELATION line
+        with _test():
+            l1, d = d[0], d[1:]
+        d.insert(0, "@RELATION 'example-dataset'\n")
         #  use a bad @ATTRIBUTE line
-        tmp_attr, d[3] = d[3], "@ATTRIBUTE test NOT_A_CORRECT_TYPE\n"
-        with open(arff, 'w') as f:
-            f.writelines(d)
-        with DSFF() as f:
-            self.assertRaises(BadInputData, f.from_arff, TEST_BASENAME)
+        with _test():
+            tmp_attr, d[3] = d[3], "@ATTRIBUTE test NOT_A_CORRECT_TYPE\n"
         #  use an @ATTRIBUTE at a bad position
-        d[3] = tmp_attr
-        d.insert(10, "@ATTRIBUTE test BAD\n")
-        with open(arff, 'w') as f:
-            f.writelines(d)
-        with DSFF() as f:
-            self.assertRaises(BadInputData, f.from_arff, TEST_BASENAME)
+        with _test():
+            d[3] = tmp_attr
+            d.insert(10, "@ATTRIBUTE test BAD\n")
+        # inject data line with a wrong number of columns
+        with _test():
+            d.insert(10, "0.123456789, 0")
         #  put @DATA at a bad position
-        d.insert(10, d.pop(6))
-        with open(arff, 'w') as f:
-            f.writelines(d)
-        with DSFF() as f:
-            self.assertRaises(BadInputData, f.from_arff, TEST_BASENAME)
+        with _test():
+            d.insert(10, d.pop(6))
     
     def test_conversion_csv(self):
         # DSFF to CSV
@@ -134,6 +131,16 @@ class TestDsff(TestCase):
         # CSV to DSFF
         with DSFF() as f:
             f.from_csv(TEST_BASENAME)
+    
+    def test_conversion_db(self):
+        # DSFF to SQL database
+        create_test_dsff()
+        with DSFF(TEST) as f:
+            self.assertIsNotNone(f.to_db(text=True))
+            self.assertIsNone(f.to_db())
+        # SQL database to DSFF
+        with DSFF() as f:
+            f.from_db(TEST_BASENAME)
     
     def test_conversion_dataset(self):
         # DSFF to FilelessDataset
@@ -155,13 +162,40 @@ class TestDsff(TestCase):
             self.assertRaises(BadInputData, f.from_dataset, TEST_BASENAME)
         os.remove(TEST_BASENAME)
     
+    def test_conversion_pyarrow_formats(self):
+        if PYARROW:
+            create_test_dsff()
+            with DSFF(TEST) as f:
+                self.assertIsNone(f.to_dataset())
+            for fmt in ["feather", "orc", "parquet"]:
+                with DSFF(INMEMORY) as f:
+                    f.from_dataset(path=TEST_BASENAME)
+                    self.assertIsNone(getattr(f, f"to_{fmt}")(TEST_BASENAME))
+                    self.assertIsNotNone(getattr(f, f"to_{fmt}")(text=True))
+                with DSFF(INMEMORY) as f:
+                    self.assertIsNone(getattr(f, f"from_{fmt}")(TEST_BASENAME))
+                    f.to_dataset(path=TEST_BASENAME)
+                os.remove(f"{TEST_BASENAME}.{fmt}")
+            rmdir(TEST_BASENAME)
+            # test without the 'label' column
+            with open(TEST_BASENAME + ".arff", 'w') as f:
+                f.write(TEST_ARFF.replace("class", "test").replace("?", "-1"))
+            with DSFF() as f:
+                f.from_arff(TEST_BASENAME)
+                self.assertIsNotNone(f._to_table())
+    
     def test_in_memory(self):
         create_test_dsff()
         with DSFF(TEST) as f:
             self.assertIsNone(f.to_dataset())
+            f.name = TEST
+            self.assertIsNotNone(f.headers)
         with DSFF(INMEMORY) as f:
             self.assertRaises(EmptyDsffFile, f.to_arff)
             self.assertIsNone(f.from_dataset(TEST_BASENAME))
             self.assertIsNone(f.to_arff())
+        os.remove(f"undefined.arff")
         rmdir(TEST_BASENAME)
+        with DSFF(INMEMORY) as f:
+            self.assertRaises(ValueError, f.from_arff)
 

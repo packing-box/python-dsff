@@ -3,17 +3,18 @@ import hashlib
 import os
 import random
 import zipfile
+from contextlib import contextmanager
 from datetime import datetime
-from dsff import DSFF, BadDsffFile, BadInputData
-from dsff.__common__ import INMEMORY, MISSING_TOKEN
+from dsff import *
+from dsff.formats.__common__ import *
 from openpyxl.worksheet.worksheet import Worksheet
 from unittest import TestCase
 
 
 BAD = "THIS_FILE_DOES_NOT_EXIST"
 TEST_NAME = "example-dataset"
-TEST = ".%s.dsff" % TEST_NAME
-TEST_BASENAME = ".%s" % TEST_NAME
+TEST = f".{TEST_NAME}.dsff"
+TEST_BASENAME = f".{TEST_NAME}"
 
 TEST_DATA = [
     ["hash", "field1", "field2", "label"],
@@ -31,7 +32,7 @@ TEST_FEATURES = {'field1': "float feaure", 'field2': "boolean feature"}
 TEST_METADATA = {'number': 10, 'counts': __count}
 
 TEST_ARFF = """@RELATION ".example-dataset"
-# test comment
+% test comment
 
 @ATTRIBUTE field1 NUMERIC
 @ATTRIBUTE field2 NUMERIC
@@ -48,6 +49,11 @@ TEST_ARFF = """@RELATION ".example-dataset"
 0.43648596037070286, 1, 0
 0.4010220773876585,  1, 1
 0.3091775358915919,  1, 0
+
+% metadata: {"sources": ["/home/user"], "counts": {"a": 6, "b": 2}, "total": 10}
+
+% field1: float feature
+% field2: boolean feature
 """
 
 

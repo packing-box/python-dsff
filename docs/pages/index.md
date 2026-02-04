@@ -14,6 +14,12 @@ This library is available on [PyPi](https://pypi.python.org/pypi/dsff/) and can 
 pip install --user dsff
 ```
 
+If you want to use additional [Apache Arrow](https://arrow.apache.org/docs/index.html) formats, you can install [`pyarrow`](https://arrow.apache.org/docs/python/index.html) with the following command:
+
+```sh
+pip install --user dsff[extra]
+```
+
 -----
 
 ## Format
