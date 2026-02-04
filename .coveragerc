@@ -1,0 +1,14 @@
+[run]
+cover_pylib = false
+source = dsff
+omit =
+    */site-packages/*
+    tests/*
+
+[report]
+exclude_lines =
+    pragma: no cover
+    if\s+__name__\s+==\s+(?P<q>(?:[\'\"]))__main__(?P=q)\s+:
+    raise NotImplementedError
+    except NotImplementedError:
+
