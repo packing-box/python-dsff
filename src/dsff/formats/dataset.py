@@ -2,17 +2,30 @@
 from .__common__ import *
 
 
-__all__ = ["from_dataset", "to_dataset"]
+__all__ = ["from_dataset", "is_dataset", "to_dataset"]
 
 
-def from_dataset(dsff, path=None):
-    """ Populate the DSFF file from a Dataset structure. """
+def _parse(path):
     if not isdir(path):
         raise BadInputData("Not a folder")
     else:
         if len(missing := [f for f in ["data.csv", "features.json", "metadata.json"] if not isfile(join(path, f))]) > 0:
             raise BadInputData(f"Not a valid dataset folder (missing: {', '.join(missing)})")
+
+
+def from_dataset(dsff, path=None):
+    """ Populate the DSFF file from a Dataset structure. """
+    _parse(path)
     dsff.write(path)
+
+
+def is_dataset(path):
+    """ Check if the input path is a valid Dataset. """
+    try:
+        _parse(path)
+        return True
+    except BadInputData:
+        return False
 
 
 def to_dataset(dsff, path=None):

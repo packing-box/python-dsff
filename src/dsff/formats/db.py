@@ -2,7 +2,7 @@
 from .__common__ import *
 
 
-__all__ = ["from_db", "to_db"]
+__all__ = ["from_db", "is_db", "to_db"]
 
 
 def from_db(dsff, path=None, exclude=DEFAULT_EXCL):
@@ -28,6 +28,36 @@ def from_db(dsff, path=None, exclude=DEFAULT_EXCL):
     cursor.execute("SELECT key,value FROM metadata;")
     dsff.write(metadata={r[0]: loads(r[1]) if isinstance(r[1], str) else r[1] for r in cursor.fetchall()})
     conn.close()
+
+
+@text_or_path
+def is_db(data):
+    """ Check if the input data or path is a valid SQL database. """
+    from sqlite3 import connect, Error
+    from sys import version_info
+    if not data.startswith(b"SQLite format 3\x00"):
+        return False
+    if version_info.minor > 10:
+        try:
+            with connect(":memory:") as c:
+                c.deserialize(data)
+                c.execute("PRAGMA schema_version;")
+            return True
+        except Error:
+            return False
+    else:  # pragma: no cover
+        from os import close, write
+        from tempfile import mkstemp
+        fd, path = mkstemp(suffix=".db")
+        try:
+            write(fd, data)
+            close(fd)
+            fd = None
+            with connect(f"file:{path}?mode=ro&immutable=1", uri=True) as c:
+                c.execute("PRAGMA schema_version;").fetchone()
+            return True
+        except (Error, OSError):
+            return False
 
 
 def to_db(dsff, path=None, text=False, primary_index=0):

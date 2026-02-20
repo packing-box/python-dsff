@@ -76,6 +76,7 @@ class TestDsff(TestCase):
             TEST_METADATA[k] = v
     
     def test_conversion_arff(self):
+        self.assertTrue(is_arff(TEST_ARFF))
         # DSFF to ARFF
         create_test_dsff()
         with DSFF(TEST) as f:
@@ -84,10 +85,10 @@ class TestDsff(TestCase):
         with DSFF(mode='w+') as f:
             self.assertRaises(ValueError, f.to_arff, ())
         # ARFF to DSFF
-        arff = TEST_BASENAME + ".arff"
         #  use a test ARFF with a comment line
-        with open(arff, 'w') as f:
+        with open(arff := f"{TEST_BASENAME}.arff", 'w') as f:
             f.write(TEST_ARFF)
+        self.assertTrue(is_arff(arff))
         with DSFF() as f:
             f.from_arff(TEST_BASENAME)
         # test for multiple error scenarios
@@ -123,24 +124,16 @@ class TestDsff(TestCase):
             d.insert(10, d.pop(6))
     
     def test_conversion_csv(self):
+        self.assertFalse(is_csv(b"PK\x03\x04\x14\x00\x00\x00\x08\x00P\xb3T\\F\xc7MH"))
         # DSFF to CSV
         create_test_dsff()
         with DSFF(TEST) as f:
             self.assertIsNotNone(f.to_csv(text=True))
             self.assertIsNone(f.to_csv())
+        self.assertTrue(is_csv(f"{TEST}.csv"))
         # CSV to DSFF
         with DSFF() as f:
             f.from_csv(TEST_BASENAME)
-    
-    def test_conversion_db(self):
-        # DSFF to SQL database
-        create_test_dsff()
-        with DSFF(TEST) as f:
-            self.assertIsNotNone(f.to_db(text=True))
-            self.assertIsNone(f.to_db())
-        # SQL database to DSFF
-        with DSFF() as f:
-            f.from_db(TEST_BASENAME)
     
     def test_conversion_dataset(self):
         # DSFF to FilelessDataset
@@ -150,6 +143,7 @@ class TestDsff(TestCase):
         # FilelessDataset to DSFF
         with DSFF() as f:
             f.from_dataset(TEST_BASENAME)
+        self.assertTrue(is_dataset(f"{TEST_BASENAME}"))
         # FilelessDataset to DSFF (bad input dataset)
         os.remove(os.path.join(TEST_BASENAME, "metadata.json"))
         with DSFF() as f:
@@ -161,6 +155,22 @@ class TestDsff(TestCase):
         with DSFF() as f:
             self.assertRaises(BadInputData, f.from_dataset, TEST_BASENAME)
         os.remove(TEST_BASENAME)
+        os.makedirs(TEST_BASENAME)
+        self.assertFalse(is_dataset(TEST_BASENAME))
+        rmdir(TEST_BASENAME)
+    
+    def test_conversion_db(self):
+        self.assertFalse(is_db(b"PK\x03\x04\x14\x00\x00\x00\x08\x00P\xb3T\\F\xc7MH"))
+        self.assertFalse(is_db(b"SQLite format 3\x00\x10\x00\x01\x01\x00@"))
+        # DSFF to SQL database
+        create_test_dsff()
+        with DSFF(TEST) as f:
+            self.assertIsNotNone(f.to_db(text=True))
+            self.assertIsNone(f.to_db())
+        self.assertTrue(is_db(f"{TEST_BASENAME}.db"))
+        # SQL database to DSFF
+        with DSFF() as f:
+            f.from_db(TEST_BASENAME)
     
     def test_conversion_pyarrow_formats(self):
         if PYARROW:
@@ -172,13 +182,16 @@ class TestDsff(TestCase):
                     f.from_dataset(path=TEST_BASENAME)
                     self.assertIsNone(getattr(f, f"to_{fmt}")(TEST_BASENAME))
                     self.assertIsNotNone(getattr(f, f"to_{fmt}")(text=True))
+                is_ = globals()[f'is_{fmt}']
+                self.assertTrue(is_(f"{TEST_BASENAME}.{fmt}"))
+                self.assertFalse(is_(b"PK\x03\x04\x14\x00\x00\x00\x08\x00P\xb3T\\F\xc7MH"))
                 with DSFF(INMEMORY) as f:
                     self.assertIsNone(getattr(f, f"from_{fmt}")(TEST_BASENAME))
                     f.to_dataset(path=TEST_BASENAME)
                 os.remove(f"{TEST_BASENAME}.{fmt}")
             rmdir(TEST_BASENAME)
             # test without the 'label' column
-            with open(TEST_BASENAME + ".arff", 'w') as f:
+            with open(f"{TEST_BASENAME}.arff", 'w') as f:
                 f.write(TEST_ARFF.replace("class", "test").replace("?", "-1"))
             with DSFF() as f:
                 f.from_arff(TEST_BASENAME)
@@ -190,10 +203,13 @@ class TestDsff(TestCase):
             self.assertIsNone(f.to_dataset())
             f.name = TEST
             self.assertIsNotNone(f.headers)
+        self.assertTrue(DSFF.is_valid_format(TEST_BASENAME))
         with DSFF(INMEMORY) as f:
             self.assertRaises(EmptyDsffFile, f.to_arff)
             self.assertIsNone(f.from_dataset(TEST_BASENAME))
             self.assertIsNone(f.to_arff())
+        self.assertRaises(ValueError, DSFF.is_valid_format, 0)
+        self.assertTrue(DSFF.is_valid_format(f"undefined.arff"))
         os.remove(f"undefined.arff")
         rmdir(TEST_BASENAME)
         with DSFF(INMEMORY) as f:

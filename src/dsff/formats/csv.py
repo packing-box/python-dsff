@@ -2,7 +2,7 @@
 from .__common__ import *
 
 
-__all__ = ["from_csv", "to_csv"]
+__all__ = ["from_csv", "is_csv", "to_csv"]
 
 
 def from_csv(dsff, path=None, exclude=DEFAULT_EXCL):
@@ -16,6 +16,17 @@ def from_csv(dsff, path=None, exclude=DEFAULT_EXCL):
             features[header.value] = ""
         break
     dsff.write(features=features)
+
+
+@text_or_path
+def is_csv(text):
+    """ Check if the input text or path is a valid CSV. """
+    try:
+        dialect = csvmod.Sniffer().sniff(text := ensure_str(text))
+        csvmod.Sniffer().has_header(text)
+        return True
+    except (csvmod.Error, UnicodeDecodeError):
+        return False
 
 
 def to_csv(dsff, path=None, text=False):

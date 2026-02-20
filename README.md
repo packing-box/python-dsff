@@ -36,8 +36,33 @@ pip install --user dsff
 ```python
 >>> import dsff
 >>> with dsff.DSFF("/path/to/my-dataset.dsff") as f:
-    f.to_dataset()  # creates ./[dsff-title] with data.csv, features.json and metadata.json
+    f.to_dataset()  # creates ./my-dataset with data.csv, features.json and metadata.json
 ```
+
+**
+
+## :heavy_plus_sign: Extensions
+
+**Install all available extensions**
+
+```sh
+pip install --user dsff[all]
+```
+
+**Dealing with [Apache Arrow](https://arrow.apache.org/) formats**
+
+```sh
+pip install --user dsff[arrow]
+```
+
+```python
+>>> import dsff
+>>> with dsff.DSFF("/path/to/my-dataset.dsff") as f:
+    f.to_feather()  # creates ./my-dataset.feather
+    f.to_orc()      # creates ./my-dataset.orc
+    f.to_parquet()  # creates ./my-dataset.parquet
+```
+
 
 ## :star: Related Projects
 

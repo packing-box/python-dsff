@@ -2,68 +2,66 @@
 from .__common__ import *
 
 
-__all__ = ["from_arff", "to_arff"]
+__all__ = ["from_arff", "is_arff", "to_arff"]
 
 
-def from_arff(dsff, path=None, target=TARGET_NAME, missing=MISSING_TOKEN):
-    """ Populate the DSFF file from an ARFF file. """
-    d, features = [], {}
-    with open(path) as f:
-        relation, attributes, data = False, [False, False], False
-        for n, l in enumerate(f, 1):
-            l, pf = l.strip(), f"Line {n}: "
-            # the file shall start with "@RELATION"
-            if not relation:
-                if l.startswith("@RELATION "):
-                    relation = True
-                    try:
-                        dsff['title'] = re.match(r"@RELATION\s+('[^']*'|\"[^\"]*\")$", l).group(1).strip("'\"")
-                        continue
-                    except Exception as e:
-                        raise BadInputData(f"{pf}failed on @RELATION ({e})")
-                else:
-                    raise BadInputData(f"{pf}did not find @RELATION")
-            # get metadata and feature descriptions from comments
-            if l.startswith("%"):
-                if re.match(r"^\%\s+metadata\s*\:\s*\{.*\}$", l):
-                    dsff.write(metadata=literal_eval(l.split(":", 1)[1]))
-                elif (m := re.match(r"^\%\s+(.*?)\s*\:\s*(.*?)$", l)):
-                    name, descr = m.groups()
-                    features[name] = descr
-                continue
-            # then ignore blank lines
-            if l == "":
-                if attributes[0] and not attributes[1]:
-                    # close the atributes block
-                    attributes[1] = True
-                    n_cols = len(d[0])
-                continue
-            if l.startswith("@ATTRIBUTE "):
-                if not attributes[0]:
-                    attributes[0] = True
-                if len(d) == 0:
-                    # start the attributes block
-                    d.append([])
-                if attributes[1]:
-                    raise BadInputData(f"{pf}found @ATTRIBUTE out of the attributes block)")
+def _parse(text_or_fh, target=TARGET_NAME, missing=MISSING_TOKEN):
+    d, features, metadata, title = [], {}, {}, ""
+    relation, attributes, data = False, [False, False], False
+    for n, l in enumerate(t.splitlines() if isinstance(t := text_or_fh, str) else t):
+        l, pf = l.strip(), f"Line {n}: "
+        # the file shall start with "@RELATION"
+        if not relation:
+            if l.startswith("@RELATION "):
+                relation = True
                 try:
-                    header = re.match(r"@ATTRIBUTE\s+([^\s]+)\s+[A-Z]+$", l).group(1)
-                    if header == "class":
-                        header = target
-                    d[0].append(header)
+                    title = re.match(r"@RELATION\s+('[^']*'|\"[^\"]*\")$", l).group(1).strip("'\"")
                     continue
-                except AttributeError:
-                    raise BadInputData(f"{pf}failed on @ATTRIBUTE (bad type)")
-            if not data:
-                if l == "@DATA":
-                    data = True
-                    continue
-                else:
-                    raise BadInputData(f"{pf}did not find @DATA where expected")
-            row = list(map(lambda x: x.strip("'\""), re.split(r",\s+", l)))
-            if len(row) != n_cols:
-                raise BadInputData(f"{pf}this row does not match the number of columns")
-            d.append(row)
+                except Exception as e:
+                    raise BadInputData(f"{pf}failed on @RELATION ({e})")
+            else:
+                raise BadInputData(f"{pf}did not find @RELATION")
+        # get metadata and feature descriptions from comments
+        if l.startswith("%"):
+            if re.match(r"^\%\s+metadata\s*\:\s*\{.*\}$", l):
+                metadata = literal_eval(l.split(":", 1)[1])
+            elif (m := re.match(r"^\%\s+(.*?)\s*\:\s*(.*?)$", l)):
+                name, descr = m.groups()
+                features[name] = descr
+            continue
+        # then ignore blank lines
+        if l == "":
+            if attributes[0] and not attributes[1]:
+                # close the atributes block
+                attributes[1] = True
+                n_cols = len(d[0])
+            continue
+        if l.startswith("@ATTRIBUTE "):
+            if not attributes[0]:
+                attributes[0] = True
+            if len(d) == 0:
+                # start the attributes block
+                d.append([])
+            if attributes[1]:
+                raise BadInputData(f"{pf}found @ATTRIBUTE out of the attributes block)")
+            try:
+                header = re.match(r"@ATTRIBUTE\s+([^\s]+)\s+[A-Z]+$", l).group(1)
+                if header == "class":
+                    header = target
+                d[0].append(header)
+                continue
+            except AttributeError:
+                raise BadInputData(f"{pf}failed on @ATTRIBUTE (bad type)")
+        if not data:
+            if l == "@DATA":
+                data = True
+                continue
+            else:
+                raise BadInputData(f"{pf}did not find @DATA where expected")
+        row = list(map(lambda x: x.strip("'\""), re.split(r",\s+", l)))
+        if len(row) != n_cols:
+            raise BadInputData(f"{pf}this row does not match the number of columns")
+        d.append(row)
     for i in range(n_cols):
         values = []
         for j, row in enumerate(d):
@@ -76,9 +74,26 @@ def from_arff(dsff, path=None, target=TARGET_NAME, missing=MISSING_TOKEN):
         if "".join(sorted(set(values))) in ["0", "1", "01"]:
             for j, row in enumerate(d):
                 if j > 0:
-                    row[i] = {'0': "False", '1': "True"}[row[i]]
-    dsff.write(data=d)
-    dsff.write(features=features)
+                    row[i] = {'0': "False", '1': "True"}[row[i]]    
+    return d, features, metadata, title
+
+
+def from_arff(dsff, path=None, target=TARGET_NAME, missing=MISSING_TOKEN):
+    """ Populate the DSFF file from an ARFF file. """
+    with open(path) as f:
+        d, ft, md, t = _parse(f, target, missing)
+    dsff['title'] = t
+    dsff.write(data=d, features=ft, metadata=md)
+
+
+@text_or_path
+def is_arff(text):
+    """ Check if the input text or path is a valid ARFF. """
+    try:
+        _parse(ensure_str(text))
+        return True
+    except (BadInputData, UnicodeDecodeError):
+        return False
 
 
 def to_arff(dsff, path=None, target=TARGET_NAME, exclude=DEFAULT_EXCL, missing=MISSING_TOKEN, text=False):

@@ -22,6 +22,9 @@ if PYARROW:  # pragma: no cover
 
 
 __all__ = ["DSFF"]
+for k in list(globals().keys()):
+    if k.startswith("is_"):
+        __all__.append(k)
 
 _FORMAT_TEXT_ALIAS = {'arff': "ARFF", 'csv': "CSV", 'db': "SQL", 'orc': "ORC"}
 _NO_EXT_FORMAT     = ["dataset"]
@@ -343,4 +346,16 @@ class DSFF:
         if p != INMEMORY and not p.endswith(".dsff"):
             p += ".dsff"
         return p
+    
+    @staticmethod
+    @text_or_path
+    def format(text):
+        for k, func in globals().items():
+            if k.startswith("is_") and func(text):
+                return k.split("_", 1)[1]
+    
+    @staticmethod
+    @text_or_path
+    def is_valid_format(text):
+        return DSFF.format(text) is not None
 
