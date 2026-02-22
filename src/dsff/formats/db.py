@@ -2,36 +2,16 @@
 from .__common__ import *
 
 
-__all__ = ["from_db", "is_db", "to_db"]
+__all__ = ["from_db", "is_db", "load_db", "to_db"]
 
 
-def from_db(dsff, path=None, exclude=DEFAULT_EXCL):
+def from_db(dsff, path=None, **kw):
     """ Populate the DSFF file from a SQLDB file. """
-    from json import loads
-    from sqlite3 import connect
-    conn = connect(path)
-    cursor = conn.cursor()
-    # list tables
-    cursor.execute("SELECT name FROM sqlite_master WHERE type='table';")
-    tables = [table[0] for table in cursor.fetchall()]
-    if not all(t in tables for t in ["data", "features", "metadata"]):  # pragma: no cover
-        raise BadInputData("The target SQLDB does not have the right format")
-    # import data
-    cursor.execute("PRAGMA table_info('data')")
-    headers = [[col[1] for col in cursor.fetchall()]]
-    cursor.execute("SELECT * FROM data;")
-    dsff.write(headers + [r for r in cursor.fetchall()])
-    # import feature definitions
-    cursor.execute("SELECT name,description FROM features;")
-    dsff.write(features={r[0]: r[1] for r in cursor.fetchall()})
-    # import metadata
-    cursor.execute("SELECT key,value FROM metadata;")
-    dsff.write(metadata={r[0]: loads(r[1]) if isinstance(r[1], str) else r[1] for r in cursor.fetchall()})
-    conn.close()
+    dsff.write(**load_db(path))
 
 
 @text_or_path
-def is_db(data):
+def is_db(data, **kw):
     """ Check if the input data or path is a valid SQL database. """
     from sqlite3 import connect, Error
     from sys import version_info
@@ -60,7 +40,34 @@ def is_db(data):
             return False
 
 
-def to_db(dsff, path=None, text=False, primary_index=0):
+def load_db(path, **kw):
+    """ Load a SQLDB file as a dictionary with data, features and metadata. """
+    from json import loads
+    from os.path import basename, splitext
+    from sqlite3 import connect
+    conn = connect(path)
+    cursor, data = conn.cursor(), {}
+    # list tables
+    cursor.execute("SELECT name FROM sqlite_master WHERE type='table';")
+    tables = [table[0] for table in cursor.fetchall()]
+    if not all(t in tables for t in ["data", "features", "metadata"]):  # pragma: no cover
+        raise BadInputData("The target SQLDB does not have the right format")
+    # import data
+    cursor.execute("PRAGMA table_info('data')")
+    headers = [[col[1] for col in cursor.fetchall()]]
+    cursor.execute("SELECT * FROM data;")
+    data['data'] = headers + [r for r in cursor.fetchall()]
+    # import feature definitions
+    cursor.execute("SELECT name,description FROM features;")
+    data['features'] = {r[0]: r[1] for r in cursor.fetchall()}
+    # import metadata
+    cursor.execute("SELECT key,value FROM metadata;")
+    data['metadata'] = {r[0]: loads(r[1]) if isinstance(r[1], str) else r[1] for r in cursor.fetchall()}
+    conn.close()
+    return data
+
+
+def to_db(dsff, path=None, text=False, primary_index=0, **kw):
     """ Create a SQLDB from the data worksheet, saved as a file or output as a string. """
     from json import dumps
     from sqlite3 import connect

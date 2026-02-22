@@ -23,7 +23,7 @@ if PYARROW:  # pragma: no cover
 
 __all__ = ["DSFF"]
 for k in list(globals().keys()):
-    if k.startswith("is_"):
+    if k.startswith("is_") or k.startswith("load_"):
         __all__.append(k)
 
 _FORMAT_TEXT_ALIAS = {'arff': "ARFF", 'csv': "CSV", 'db': "SQL", 'orc': "ORC"}

@@ -1,25 +1,25 @@
 # -*- coding: UTF-8 -*-
 from .__common__ import *
+from .csv import load_csv
 
 
-__all__ = ["from_dataset", "is_dataset", "to_dataset"]
+__all__ = ["from_dataset", "is_dataset", "load_dataset", "to_dataset"]
 
 
 def _parse(path):
-    if not isdir(path):
+    if not isdir(expanduser(path)):
         raise BadInputData("Not a folder")
-    else:
-        if len(missing := [f for f in ["data.csv", "features.json", "metadata.json"] if not isfile(join(path, f))]) > 0:
-            raise BadInputData(f"Not a valid dataset folder (missing: {', '.join(missing)})")
+    if len(missing := [f for f in ["data.csv", "features.json", "metadata.json"] if not isfile(join(path, f))]) > 0:
+        raise BadInputData(f"Not a valid dataset folder (missing: {', '.join(missing)})")
 
 
-def from_dataset(dsff, path=None):
+def from_dataset(dsff, path=None, **kw):
     """ Populate the DSFF file from a Dataset structure. """
     _parse(path)
     dsff.write(path)
 
 
-def is_dataset(path):
+def is_dataset(path, **kw):
     """ Check if the input path is a valid Dataset. """
     try:
         _parse(path)
@@ -28,7 +28,21 @@ def is_dataset(path):
         return False
 
 
-def to_dataset(dsff, path=None):
+def load_dataset(path, **kw):
+    """ Load a dataset folder as a dictionary with data, features and metadata. """
+    if not isdir(d := expanduser(str(path))):
+        raise BadInputData("Not a folder")
+    dp, fp, mp = join(d, "data.csv"), join(d, "features.json"), join(d, "metadata.json")
+    data = {}
+    data['data'] = load_csv(dp)['data']
+    with open(fp) as f:
+        data['features'] = json.load(f)
+    with open(mp) as f:
+        data['metadata'] = json.load(f)
+    return data
+
+
+def to_dataset(dsff, path=None, **kw):
     """ Create a dataset folder according to the following structure ;
     name
      +-- data.csv

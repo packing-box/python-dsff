@@ -2,20 +2,20 @@
 from .__common__ import *
 
 
-__all__ = ["from_arff", "is_arff", "to_arff"]
+__all__ = ["from_arff", "is_arff", "load_arff", "to_arff"]
 
 
-def _parse(text_or_fh, target=TARGET_NAME, missing=MISSING_TOKEN):
+def _parse(text_or_fh, target=TARGET_NAME, missing=MISSING_TOKEN, **kw):
     d, features, metadata, title = [], {}, {}, ""
     relation, attributes, data = False, [False, False], False
     for n, l in enumerate(t.splitlines() if isinstance(t := text_or_fh, str) else t):
         l, pf = l.strip(), f"Line {n}: "
         # the file shall start with "@RELATION"
         if not relation:
-            if l.startswith("@RELATION "):
+            if l.upper().startswith("@RELATION "):
                 relation = True
                 try:
-                    title = re.match(r"@RELATION\s+('[^']*'|\"[^\"]*\")$", l).group(1).strip("'\"")
+                    title = re.match(r"@RELATION\s+('[^']*'|\"[^\"]*\")$", l, re.I).group(1).strip("'\"")
                     continue
                 except Exception as e:
                     raise BadInputData(f"{pf}failed on @RELATION ({e})")
@@ -34,9 +34,8 @@ def _parse(text_or_fh, target=TARGET_NAME, missing=MISSING_TOKEN):
             if attributes[0] and not attributes[1]:
                 # close the atributes block
                 attributes[1] = True
-                n_cols = len(d[0])
             continue
-        if l.startswith("@ATTRIBUTE "):
+        if l.upper().startswith("@ATTRIBUTE "):
             if not attributes[0]:
                 attributes[0] = True
             if len(d) == 0:
@@ -45,21 +44,23 @@ def _parse(text_or_fh, target=TARGET_NAME, missing=MISSING_TOKEN):
             if attributes[1]:
                 raise BadInputData(f"{pf}found @ATTRIBUTE out of the attributes block)")
             try:
-                header = re.match(r"@ATTRIBUTE\s+([^\s]+)\s+[A-Z]+$", l).group(1)
+                header = re.match(r"@ATTRIBUTE\s+([^\s]+)\s+(?:[a-zA-Z]+|\{.*?\})$", l, re.I).group(1).strip("'\"")
                 if header == "class":
                     header = target
+                else:
+                    features.setdefault(header, "")
                 d[0].append(header)
                 continue
             except AttributeError:
                 raise BadInputData(f"{pf}failed on @ATTRIBUTE (bad type)")
         if not data:
-            if l == "@DATA":
+            if l.upper() == "@DATA":
                 data = True
+                n_cols = len(d[0])
                 continue
             else:
                 raise BadInputData(f"{pf}did not find @DATA where expected")
-        row = list(map(lambda x: x.strip("'\""), re.split(r",\s+", l)))
-        if len(row) != n_cols:
+        if len(row := list(map(lambda x: x.strip("'\""), re.split(r",\s*", l)))) != n_cols:
             raise BadInputData(f"{pf}this row does not match the number of columns")
         d.append(row)
     for i in range(n_cols):
@@ -78,7 +79,7 @@ def _parse(text_or_fh, target=TARGET_NAME, missing=MISSING_TOKEN):
     return d, features, metadata, title
 
 
-def from_arff(dsff, path=None, target=TARGET_NAME, missing=MISSING_TOKEN):
+def from_arff(dsff, path=None, target=TARGET_NAME, missing=MISSING_TOKEN, **kw):
     """ Populate the DSFF file from an ARFF file. """
     with open(path) as f:
         d, ft, md, t = _parse(f, target, missing)
@@ -87,7 +88,7 @@ def from_arff(dsff, path=None, target=TARGET_NAME, missing=MISSING_TOKEN):
 
 
 @text_or_path
-def is_arff(text):
+def is_arff(text, target=TARGET_NAME, missing=MISSING_TOKEN, **kw):
     """ Check if the input text or path is a valid ARFF. """
     try:
         _parse(ensure_str(text))
@@ -96,7 +97,14 @@ def is_arff(text):
         return False
 
 
-def to_arff(dsff, path=None, target=TARGET_NAME, exclude=DEFAULT_EXCL, missing=MISSING_TOKEN, text=False):
+def load_arff(path, target=TARGET_NAME, missing=MISSING_TOKEN, **kw):
+    """ Load an ARFF file as a dictionary with data, features and metadata. """
+    with open(path) as f:
+        d, ft, md, _ = _parse(f, target, missing)
+    return {'data': d, 'features': ft, 'metadata': md}
+
+
+def to_arff(dsff, path=None, target=TARGET_NAME, exclude=DEFAULT_EXCL, missing=MISSING_TOKEN, text=False, **kw):
     """ Output the dataset in ARFF format, suitable for use with the Weka framework, saved as a file or output as a
          string. """
     name = splitext(basename(path))[0]

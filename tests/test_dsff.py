@@ -89,6 +89,7 @@ class TestDsff(TestCase):
         with open(arff := f"{TEST_BASENAME}.arff", 'w') as f:
             f.write(TEST_ARFF)
         self.assertTrue(is_arff(arff))
+        self.assertIsInstance(load_arff(arff), dict)
         with DSFF() as f:
             f.from_arff(TEST_BASENAME)
         # test for multiple error scenarios
@@ -130,7 +131,8 @@ class TestDsff(TestCase):
         with DSFF(TEST) as f:
             self.assertIsNotNone(f.to_csv(text=True))
             self.assertIsNone(f.to_csv())
-        self.assertTrue(is_csv(f"{TEST}.csv"))
+        self.assertTrue(is_csv(csv := f"{TEST_BASENAME}.csv"))
+        self.assertIsInstance(load_csv(csv), dict)
         # CSV to DSFF
         with DSFF() as f:
             f.from_csv(TEST_BASENAME)
@@ -143,7 +145,9 @@ class TestDsff(TestCase):
         # FilelessDataset to DSFF
         with DSFF() as f:
             f.from_dataset(TEST_BASENAME)
-        self.assertTrue(is_dataset(f"{TEST_BASENAME}"))
+        self.assertTrue(is_dataset(TEST_BASENAME))
+        self.assertRaises(BadInputData, load_dataset, 0)
+        self.assertIsInstance(load_dataset(TEST_BASENAME), dict)
         # FilelessDataset to DSFF (bad input dataset)
         os.remove(os.path.join(TEST_BASENAME, "metadata.json"))
         with DSFF() as f:
@@ -167,7 +171,8 @@ class TestDsff(TestCase):
         with DSFF(TEST) as f:
             self.assertIsNotNone(f.to_db(text=True))
             self.assertIsNone(f.to_db())
-        self.assertTrue(is_db(f"{TEST_BASENAME}.db"))
+        self.assertTrue(is_db(db := f"{TEST_BASENAME}.db"))
+        self.assertIsInstance(load_db(db), dict)
         # SQL database to DSFF
         with DSFF() as f:
             f.from_db(TEST_BASENAME)
@@ -183,8 +188,9 @@ class TestDsff(TestCase):
                     self.assertIsNone(getattr(f, f"to_{fmt}")(TEST_BASENAME))
                     self.assertIsNotNone(getattr(f, f"to_{fmt}")(text=True))
                 is_ = globals()[f'is_{fmt}']
-                self.assertTrue(is_(f"{TEST_BASENAME}.{fmt}"))
+                self.assertTrue(is_(fn := f"{TEST_BASENAME}.{fmt}"))
                 self.assertFalse(is_(b"PK\x03\x04\x14\x00\x00\x00\x08\x00P\xb3T\\F\xc7MH"))
+                self.assertIsInstance(globals()[f'load_{fmt}'](fn), dict)
                 with DSFF(INMEMORY) as f:
                     self.assertIsNone(getattr(f, f"from_{fmt}")(TEST_BASENAME))
                     f.to_dataset(path=TEST_BASENAME)
