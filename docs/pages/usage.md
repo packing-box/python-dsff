@@ -22,13 +22,13 @@ Truncate |  |  | * | *
 
 !!! note "Bound methods for conversions"
 
-    When *Read* is available, the `to_*` (e.g. `to_arff`) methods are bound to the DSFF class. On the contrary, when *Write* is available, the `from_*` (e.g. `from_arff`) methods are bound to the DSFF class. As a consequence, the modes with "`+`" have both `to_*` and `from_*` methods attached.
+    The `to_*` (e.g. `to_arff`) and `from_*` (e.g. `from_arff`) methods are bound to every DSFF instance, whatever the mode. The `save` method is only bound when *Write* is available (`r+`, `w` and `w+`).
 
 The following pictures illustrate the available alternative formats and their applicable modes:
 
 Converting from other formats to DSFF |  Converting from DSFF to other formats
 :-------------------------------------------------------:|:-----------------------------------------------------:
-![From alternative formats to DSFF](https://github.com/packing-box/python-dsff/raw/main/docs/pages/imgs/dsff-from.png) | ![From DSFF to alternative formats](https://github.com/packing-box/python-dsff/raw/main/docs/pages/imgs/dsff-to.png)
+![From alternative formats to DSFF](img/dsff-from.png) | ![From DSFF to alternative formats](img/dsff-to.png)
 
 !!! warning "Lossy conversions"
     

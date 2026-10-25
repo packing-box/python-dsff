@@ -1,12 +1,18 @@
 site_author: dhondta
 site_name: DSFF - DataSet File Format
 site_description: Dedicated file format for exchanging datasets
-copyright: Copyright &copy; 2021-2022 Alexandre D'Hondt
+site_url: https://python-dsff.readthedocs.io
 repo_url: https://github.com/packing-box/python-dsff
+edit_uri: edit/main/docs/pages/
+copyright: Copyright &copy; 2021 Alexandre D'Hondt
 docs_dir: pages
 nav:
-  - Introduction: index.md
+  - Home: index.md
+  - Installation: installation.md
   - Usage: usage.md
+  - Python API: api.md
+  - How it works: internals.md
+  - Contributing: contributing.md
 extra:
   generator: false
   social:
@@ -24,22 +30,30 @@ extra:
       name: Alex on Twitter
 theme:
   name: material
+  logo: img/logo.png
+  favicon: img/icon.png
   palette:
     - scheme: default
       toggle:
-        icon: material/brightness-7 
+        icon: material/brightness-7
         name: Switch to dark mode
     - scheme: slate
       toggle:
         icon: material/brightness-4
         name: Switch to light mode
-  logo: imgs/logo.png
+  features:
+    - content.code.copy
+    - navigation.sections
+    - navigation.top
+    - toc.follow
 use_directory_urls: false
 markdown_extensions:
   - admonition
-  - codehilite:
-      linenums: true
+  - attr_list
+  - def_list
   - pymdownx.details
+  - pymdownx.highlight
+  - pymdownx.inlinehilite
   - pymdownx.superfences
   - tables
   - toc:
