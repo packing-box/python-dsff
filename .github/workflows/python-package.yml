@@ -96,6 +96,10 @@ jobs:
   deploy:
     # only release from main, never from pull requests
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    # must match the environment of the trusted publisher configured on PyPI
+    environment:
+      name: pypi
+      url: https://pypi.org/p/dsff
     permissions:
       contents: read
       id-token: write  # for PyPI trusted publishing (OIDC)

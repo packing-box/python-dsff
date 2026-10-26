@@ -43,9 +43,12 @@ def text_or_path(f):
     def _wrapper(txt_path, *args, **kwargs):
         if not isinstance(txt_path, bytes):
             if isinstance(txt_path, str):
-                if not re.search(r"[<>:\'\"/\\|?*\x00-\x1f]", txt_path, re.I) and exists(txt_path):
-                    if not isdir(txt_path):
-                        with open(txt_path, "rb") as fh:
+                # a string is a path if it points to an existing file or folder (a multiline string is a text)
+                if "\n" not in txt_path and exists(p := expanduser(txt_path)):
+                    if isdir(p):
+                        txt_path = p
+                    else:
+                        with open(p, "rb") as fh:
                             txt_path = fh.read()
                 else:
                     txt_path = txt_path.encode()

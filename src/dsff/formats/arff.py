@@ -4,78 +4,105 @@ from .__common__ import *
 
 __all__ = ["from_arff", "is_arff", "load_arff", "to_arff"]
 
+_NAME = r"('(?:[^'\\]|\\.)*'|\"(?:[^\"\\]|\\.)*\"|[^\s'\"%{},]+)"
+_TYPE = r"(?:numeric|real|integer|string|relational|date(?:\s+.+)?|\{.*\})"
+
+
+def _quote(value):
+    """ Quote a string value, escaping backslashes and single quotes. """
+    return "'{}'".format(str(value).replace("\\", "\\\\").replace("'", "\\'"))
+
+
+def _split(line):
+    """ Split a data line on commas, honoring quoted values (with backslash escapes). """
+    values, current, quote, quoted, i = [], "", None, False, 0
+    while i < len(line):
+        c = line[i]
+        if quote:
+            if c == "\\" and i + 1 < len(line):
+                current += line[i+1]
+                i += 1
+            elif c == quote:
+                quote = None
+            else:
+                current += c
+        elif c == ",":
+            values.append(current if quoted else current.strip())
+            current, quoted = "", False
+        elif c in "'\"" and current.strip() == "" and not quoted:
+            current, quote, quoted = "", c, True
+        elif not quoted:
+            current += c
+        elif not c.isspace():
+            raise BadInputData("unexpected character after a quoted value")
+        i += 1
+    if quote:
+        raise BadInputData("unterminated quoted value")
+    values.append(current if quoted else current.strip())
+    return values
+
+
+def _unquote(name):
+    if len(name) >= 2 and name[0] == name[-1] and name[0] in "'\"":
+        name = re.sub(r"\\(.)", r"\1", name[1:-1])
+    return name
+
 
 def _parse(text_or_fh, target=TARGET_NAME, missing=MISSING_TOKEN, **kw):
-    d, features, metadata, title = [], {}, {}, ""
-    relation, attributes, data = False, [False, False], False
-    for n, l in enumerate(t.splitlines() if isinstance(t := text_or_fh, str) else t):
+    d, comments, metadata, title, n_cols = [[]], {}, {}, "", None
+    relation = False
+    for n, l in enumerate(t.splitlines() if isinstance(t := text_or_fh, str) else t, 1):
         l, pf = l.strip(), f"Line {n}: "
+        # ignore blank lines ; get metadata and feature descriptions from comments
+        if l == "":
+            continue
+        if l.startswith("%"):
+            if (m := re.match(r"^\%\s*metadata\s*\:\s*(\{.*\})$", l)):
+                try:
+                    metadata = json.loads(m.group(1))
+                except ValueError:
+                    try:
+                        metadata = literal_eval(m.group(1))
+                    except (SyntaxError, ValueError) as e:
+                        raise BadInputData(f"{pf}failed on metadata ({e})")
+            elif (m := re.match(r"^\%\s*(.*?)\s*\:\s*(.*?)$", l)):
+                comments[m.group(1)] = m.group(2)
+            continue
         # the file shall start with "@RELATION"
         if not relation:
-            if l.upper().startswith("@RELATION "):
-                relation = True
-                try:
-                    title = re.match(r"@RELATION\s+('[^']*'|\"[^\"]*\")$", l, re.I).group(1).strip("'\"")
-                    continue
-                except Exception as e:
-                    raise BadInputData(f"{pf}failed on @RELATION ({e})")
-            else:
-                raise BadInputData(f"{pf}did not find @RELATION")
-        # get metadata and feature descriptions from comments
-        if l.startswith("%"):
-            if re.match(r"^\%\s+metadata\s*\:\s*\{.*\}$", l):
-                metadata = literal_eval(l.split(":", 1)[1])
-            elif (m := re.match(r"^\%\s+(.*?)\s*\:\s*(.*?)$", l)):
-                name, descr = m.groups()
-                features[name] = descr
+            if (m := re.match(rf"@RELATION\s+{_NAME}$", l, re.I)) is None:
+                raise BadInputData(f"{pf}did not find a valid @RELATION")
+            relation, title = True, _unquote(m.group(1))
             continue
-        # then ignore blank lines
-        if l == "":
-            if attributes[0] and not attributes[1]:
-                # close the atributes block
-                attributes[1] = True
+        if l.upper().startswith("@ATTRIBUTE"):
+            if n_cols is not None:
+                raise BadInputData(f"{pf}found @ATTRIBUTE out of the attributes block")
+            if (m := re.match(rf"@ATTRIBUTE\s+{_NAME}\s+{_TYPE}$", l, re.I)) is None:
+                raise BadInputData(f"{pf}failed on @ATTRIBUTE (bad name or type)")
+            header = _unquote(m.group(1))
+            d[0].append(target if header == "class" else header)
             continue
-        if l.upper().startswith("@ATTRIBUTE "):
-            if not attributes[0]:
-                attributes[0] = True
-            if len(d) == 0:
-                # start the attributes block
-                d.append([])
-            if attributes[1]:
-                raise BadInputData(f"{pf}found @ATTRIBUTE out of the attributes block)")
-            try:
-                header = re.match(r"@ATTRIBUTE\s+([^\s]+)\s+(?:[a-zA-Z]+|\{.*?\})$", l, re.I).group(1).strip("'\"")
-                if header == "class":
-                    header = target
-                else:
-                    features.setdefault(header, "")
-                d[0].append(header)
-                continue
-            except AttributeError:
-                raise BadInputData(f"{pf}failed on @ATTRIBUTE (bad type)")
-        if not data:
-            if l.upper() == "@DATA":
-                data = True
-                n_cols = len(d[0])
-                continue
-            else:
+        if n_cols is None:
+            if l.upper() != "@DATA" or len(d[0]) == 0:
                 raise BadInputData(f"{pf}did not find @DATA where expected")
-        if len(row := list(map(lambda x: x.strip("'\""), re.split(r",\s*", l)))) != n_cols:
+            n_cols = len(d[0])
+            continue
+        if len(row := _split(l)) != n_cols:
             raise BadInputData(f"{pf}this row does not match the number of columns")
         d.append(row)
+    if n_cols is None:
+        raise BadInputData("did not find @DATA")
     for i in range(n_cols):
-        values = []
-        for j, row in enumerate(d):
-            if j == 0:
-                continue
-            if row[i] not in values:
-                values.append(row[i])
+        values = set()
+        for row in d[1:]:
+            values.add(row[i])
             if row[i] in ["-", missing]:
                 row[i] = {'-': "", missing: None}[row[i]]
-        if "".join(sorted(set(values))) in ["0", "1", "01"]:
-            for j, row in enumerate(d):
-                if j > 0:
-                    row[i] = {'0': "False", '1': "True"}[row[i]]    
+        if len(values) > 0 and values <= {"0", "1"}:
+            for row in d[1:]:
+                row[i] = {'0': "False", '1': "True"}[row[i]]
+    # feature descriptions are the comments whose names are attributes
+    features = {h: comments.get(h, "") for h in d[0] if h != target}
     return d, features, metadata, title
 
 
@@ -91,7 +118,7 @@ def from_arff(dsff, path=None, target=TARGET_NAME, missing=MISSING_TOKEN, **kw):
 def is_arff(text, target=TARGET_NAME, missing=MISSING_TOKEN, **kw):
     """ Check if the input text or path is a valid ARFF. """
     try:
-        _parse(ensure_str(text))
+        _parse(ensure_str(text), target, missing)
         return True
     except (BadInputData, UnicodeDecodeError):
         return False
@@ -108,69 +135,57 @@ def to_arff(dsff, path=None, target=TARGET_NAME, exclude=DEFAULT_EXCL, missing=M
     """ Output the dataset in ARFF format, suitable for use with the Weka framework, saved as a file or output as a
          string. """
     name = splitext(basename(path))[0]
-    _d = lambda c: {None: missing, '': "-", 'False': "0", 'True': "1"}.get(c.value, c.value)
-    _sanitize_n = lambda c: _d(c).replace("<", "[lt]").replace(">", "[gt]")
-    _sanitize_v = lambda c: _d(c)[1:].strip("\"'") if _d(c).startswith("=") else _d(c)
-    data = dsff['data']
-    # compute the list of features and their data types
+    _missing = lambda v: v is None or v == missing
+    _numeric = lambda v: isinstance(v, (bool, int, float))
+    def _name(h):
+        h = str(h).replace("<", "[lt]").replace(">", "[gt]")
+        return h if re.match(r"[^\s'\"%{},]+$", h) else _quote(h)
+    data = dsff.data
+    headers, rows = [str(h) for h in data[0]], data[1:]
+    # select the relevant columns, the target (if any) being the last one
+    cols = [i for i, h in enumerate(headers) if h not in exclude and h != target]
+    i_target = headers.index(target) if target in headers else -1
+    if i_target > -1:
+        cols.append(i_target)
+    # compute the data type of each column from all of its values
+    attributes, types = [], []
     dsff.logger.debug("> computing features and types...")
-    d, mlen_h, i_target, h_excl = [], 0, -1, []
-    # collect headers and compute the indices list for non-data columns
-    for headers in data.rows:
-        for i, header in enumerate(headers):
-            header = _sanitize_n(header)
-            if header in exclude:
-                h_excl.append(i)
-                continue
-            if header == target:
-                i_target = i
-                continue
-            mlen_h = max(mlen_h, len(header))
-        break
-    # filter headers on the relevant data
-    headers = [h for k, h in enumerate(headers) if k != i_target and k not in h_excl] + \
-              [headers[i_target] if i_target > -1 else []]
+    for i in cols:
+        values = [r[i] for r in rows if not _missing(r[i])]
+        if i == i_target and len(values) > 0:
+            labels = sorted(set(str(int(v) if isinstance(v, bool) else v) for v in values))
+            t = "{%s}" % ",".join(map(_quote, labels))
+        else:
+            t = "NUMERIC" if all(_numeric(v) for v in values) else "STRING"
+        attributes.append(("class" if i == i_target else _name(headers[i]), t))
+        types.append(t)
     # format the data according to the ARFF format
     dsff.logger.debug("> computing data...")
-    types = []
-    # parse labels, data types and relevant data
-    for i, row in enumerate(data.rows):
-        if i == 0:
-            continue  # do not process headers
-        if len(types) == 0:
-            labels = ["0", "1"] if i_target == -1 else \
-                     list(set(_sanitize_v(row[i_target]) for k, row in enumerate(data) if k > 0))
-            labels = [x for x in labels if x != missing]
-            # compute types
-            for j, cell in enumerate(row):
-                v = _sanitize_v(cell)
-                try:
-                    float(v)
-                    t = "NUMERIC"
-                except ValueError:
-                    t = "STRING"
-                types.append(t)
-            # filter data types based on the relevant columns
-            types = [t for k, t in enumerate(types) if k != i_target and k not in h_excl] + \
-                    [types[i_target] if i_target > -1 else []]
-            # compute the list of ARFF attribute lines based on the column names and data types
-            a = [("@ATTRIBUTE {: <%s} {}" % mlen_h).format("class" if j == len(types)-1 else \
-                  _sanitize_n(headers[j]), t) for j, t in enumerate(types)]
-            mlen_c = [0] * len(types)
-        # filter data based on the relevant columns
-        row = [_sanitize_v(x) for k, x in enumerate(row) if k != i_target and k not in h_excl] + \
-              ([_sanitize_v(row[i_target])] if i_target > -1 else [])
-        # compute the maximum length for each column
-        mlen_c = [max(x, len(row[k]) if types[k] == "NUMERIC" else len(row[k])+2) for k, x in enumerate(mlen_c)]
+    d = []
+    for r in rows:
+        row = []
+        for i, t in zip(cols, types):
+            v = r[i]
+            if _missing(v):
+                v = missing
+            elif isinstance(v, bool):
+                v = str(int(v)) if t == "NUMERIC" else _quote(int(v))
+            elif t == "NUMERIC":
+                v = str(v)
+            else:
+                v = _quote("-" if v == "" else v)
+            row.append(v)
         d.append(row)
-    # format the resulting data and output the ARFF
-    d = (nl := "\n").join(" ".join(("{: <%s}" % (mlen_c[k]+1)).format((x if types[k] == "NUMERIC" or \
-                       x == MISSING_TOKEN else "'%s'" % x) + ",") for k, x in enumerate(row)).rstrip(" ,") for row in d)
-    arff = f"@RELATION \"{name}\"\n\n{nl.join(a)}\n\n@DATA\n{d}\n\n" \
-           f"{['', f'% metadata: {json.dumps(dsff.metadata)}'][len(dsff.metadata) > 0]}\n\n" \
-           f"{nl.join(f'% {name}: {descr}' for name, descr in dsff.features.items())}"
+    # align the columns for readability
+    widths = [max([len(row[k]) for row in d] + [0]) + 1 for k in range(len(cols))]
+    d = (nl := "\n").join(" ".join(f"{v},".ljust(widths[k] + 1) for k, v in enumerate(row)).rstrip(" ,") for row in d)
+    mlen = max([len(a) for a, _ in attributes] + [0])
+    a = nl.join(f"@ATTRIBUTE {a.ljust(mlen)} {t}" for a, t in attributes)
+    descr = lambda v: "" if v is None else str(v).replace("\n", " ")
+    arff = f"@RELATION {_quote(name)}\n\n{a}\n\n@DATA\n{d}\n\n" \
+           f"{['', f'% metadata: {json.dumps(dsff.metadata, default=str)}'][len(dsff.metadata) > 0]}\n\n" \
+           f"{nl.join(f'% {n}: {descr(v)}' for n, v in dsff.features.items())}"
     if text:
         return arff
     with open(path, 'w+') as f:
         f.write(arff)
-

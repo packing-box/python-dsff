@@ -1,7 +1,6 @@
 # -*- coding: UTF-8 -*-
 import builtins
 import logging
-import openpyxl.reader.excel as excelr
 import types
 from ast import literal_eval
 from datetime import datetime
@@ -10,7 +9,6 @@ from getpass import getuser
 from openpyxl import load_workbook, Workbook
 from openpyxl.styles import Alignment, Font
 from openpyxl.utils import get_column_letter
-from zipfile import BadZipFile, ZipFile
 
 from .__common__ import *
 from .arff import *
@@ -21,13 +19,44 @@ if PYARROW:  # pragma: no cover
     from .pa import *
 
 
-__all__ = ["DSFF"]
-for k in list(globals().keys()):
-    if k.startswith("is_") or k.startswith("load_"):
-        __all__.append(k)
-
 _FORMAT_TEXT_ALIAS = {'arff': "ARFF", 'csv': "CSV", 'db': "SQL", 'orc': "ORC"}
 _NO_EXT_FORMAT     = ["dataset"]
+
+
+def _open_workbook(path_or_fh):
+    """ Load a workbook and check that it complies with DSFF. """
+    # openpyxl only validates the extension of a path, hence open the file to allow '.dsff'
+    try:
+        if hasattr(path_or_fh, "read"):
+            wb = load_workbook(path_or_fh)
+        else:
+            with open(path_or_fh, 'rb') as fh:
+                wb = load_workbook(fh)
+    except Exception:
+        raise BadDsffFile("File is not a DSFF file")
+    # check that the file has only 2 worksheets: 'data' and 'features'
+    if wb.sheetnames != ["data", "features"]:
+        raise BadDsffFile("File is not a DSFF file")
+    # check that the 'features' worksheet has 2 columns: 'name' and 'description'
+    for headers in wb['features'].rows:
+        if len(headers) != 2 or headers[0].value != "name" or headers[1].value != "description":
+            raise BadDsffFile("The features worksheet does not comply with DSFF")
+        break
+    return wb
+
+
+@text_or_path
+def is_dsff(data, **kw):
+    """ Check if the input data or path is a valid DSFF. """
+    try:
+        _open_workbook(BytesIO(data))
+        return True
+    except BadDsffFile:
+        return False
+
+
+__all__ = ["DSFF"] + [k for k, v in list(globals().items()) if k.startswith(("is_", "load_")) and callable(v) and \
+                      getattr(v, "__module__", "").startswith("dsff")]
 
 
 for name, etype in [("BadDsffFile", "OSError"), ("BadInputData", "ValueError"), ("EmptyDsffFile", "ValueError")]:
@@ -44,7 +73,10 @@ def _bind_from(dsff):
                 path, a = a[0], a[1:]
             elif 'path' in kw:
                 path = kw.pop('path')
-            path = _fix_path(path or dsff.name, f.__name__.split("_", 1)[1])
+            if dsff.mode == "r":
+                raise ValueError("DSFF opened in read-only mode")
+            path = _fix_path(path or (INMEMORY if dsff.name == INMEMORY else _default_name(dsff)),
+                             f.__name__.split("_", 1)[1], True)
             if path == INMEMORY:
                 raise ValueError("no path specified")
             dsff.logger.debug(f"creating DSFF from {path}...")
@@ -64,8 +96,7 @@ def _bind_to(dsff):
                 path, a = a[0], a[1:]
             elif 'path' in kw:
                 path = kw.pop('path')
-            path = _fix_path(path or ("undefined" if dsff.name == INMEMORY else dsff.name),
-                             fmt := f.__name__.split("_", 1)[1])
+            path = _fix_path(path or _default_name(dsff), fmt := f.__name__.split("_", 1)[1])
             dsff.logger.debug(f"converting DSFF to {path}..." if 'text' not in kw or kw['text'] else \
                               f"converting DSFF to {_FORMAT_TEXT_ALIAS.get(fmt, fmt.capitalize())}...")
             return f(dsff, path, *a, **kw)
@@ -74,14 +105,42 @@ def _bind_to(dsff):
     return _is_empty
 
 
-def _fix_path(path, ext):
-    from os.path import expanduser, splitext
+def _default_name(dsff):
+    name = dsff.name
+    if name == INMEMORY:
+        return "undefined"
+    return name[:-5] if name.endswith(".dsff") else name
+
+
+def _fix_path(path, ext, existing=False):
+    """ Append the extension of the format to the path, unless it already has it (or, for an input file, unless the
+         path already points to a file). """
     if path == INMEMORY:
         return path
-    path = splitext(expanduser(path))[0]
-    if ext is not None and ext not in _NO_EXT_FORMAT and not path.endswith(f".{ext}"):
-        path += f".{ext}"
-    return path
+    path = expanduser(path)
+    if ext is None or ext in _NO_EXT_FORMAT or path.lower().endswith(f".{ext}") or existing and isfile(path):
+        return path
+    return f"{path}.{ext}"
+
+
+def _to_cell(value, missing=MISSING_TOKEN):
+    """ Convert a value to what is stored in a cell ; scalars (bool, int, float) are stored natively. """
+    if value is None:
+        return missing
+    if isinstance(value, (bool, int, float)):
+        return value
+    return _eval(str(value))
+
+
+def _eval(value):
+    """ Evaluate a string holding a scalar (bool, int or float), otherwise keep it as is. """
+    if not isinstance(value, str):
+        return value
+    try:
+        v = literal_eval(value)
+    except Exception:
+        return value
+    return v if isinstance(v, (bool, int, float)) else value
 
 
 class DSFF:
@@ -125,26 +184,10 @@ class DSFF:
                 raise FileNotFoundError("Input .dsff does not exist")            
         # if the target path exists and is a file, open it
         if mode in ["r", "r+"] and path != INMEMORY:
-            # disable archive validation as it does not recognize '.dsff'
-            tmp = excelr._validate_archive
-            excelr._validate_archive = lambda f: ZipFile(f, 'r')
-            try:
-                self.__wb = load_workbook(path)
-            except BadZipFile:
-                raise BadDsffFile("File is not a DSFF file")
-            finally:
-                excelr._validate_archive = tmp
-            # check that the file has only 2 worksheets: 'data' and 'features'
-            if [ws._WorkbookChild__title for ws in self.__wb.worksheets] != ["data", "features"]:
-                raise BadDsffFile("File is not a DSFF file")
-            # check that the 'features' worksheet has 2 columns: 'name' and 'description'
-            for headers in self.__wb['features'].rows:
-                if len(headers) != 2 or headers[0].value != "name" or headers[1].value != "description":
-                    raise BadDsffFile("The features worksheet does not comply with DSFF")
-                break
+            self.__wb = _open_workbook(path)
             return
         # otherwise, create a new workbook with the default worksheets
-        if isfile(self.path):
+        if path is not None and isfile(self.path):
             remove(self.path)  # re-create
         self.__wb = Workbook()
         del self.__wb['Sheet']  # remove the default sheet
@@ -154,8 +197,10 @@ class DSFF:
     def __enter__(self):
         return self
     
-    def __exit__(self, *args):
-        self.__save()
+    def __exit__(self, exc_type, *args):
+        # do not save a dataset that may be incomplete
+        if exc_type is None:
+            self.__save()
         self.close()
     
     def __getitem__(self, name):
@@ -176,6 +221,7 @@ class DSFF:
     def __setitem__(self, name, value):
         if name in ["data", "features"]:
             raise ValueError(f"'{name}' is a name reserved for a worksheet")
+        self.__check_writable()
         # see the note from __getitem__ related to 'description'
         if hasattr(self.__wb.properties, name) and name != "description":
             setattr(self.__wb.properties, name, value)
@@ -184,11 +230,12 @@ class DSFF:
         self.__wb.properties.description = json.dumps(d)
         self.__change = True
     
+    def __check_writable(self):
+        if self.mode == "r":
+            raise ValueError("DSFF opened in read-only mode")
+    
     def __eval(self, v):
-        try:
-            return literal_eval(v)
-        except (SyntaxError, ValueError):
-            return v
+        return _eval(v)
     
     def __save(self):
         if self.mode == "r" or self.path == INMEMORY:
@@ -198,7 +245,7 @@ class DSFF:
             if props.creator is None or props.creator == "openpyxl":
                 props.creator = getuser()
             props.title = self.name
-            props.description = self.metadata
+            props.description = json.dumps(self.metadata)
             if isfile(self.path) and self.mode.startswith("w"):
                 remove(self.path)
             self.__wb.save(self.path)
@@ -207,14 +254,16 @@ class DSFF:
     def _to_table(self):
         if not PYARROW:
             raise NotImplementedError("This method is available only wheh Pyarrow is installed")
-        headers = self.data[0]
-        try:
-            l = headers.index("label")
-        except ValueError:
-            l = -1
-        cols = [pyarrow.array(col if i != l else [[c, None][c == MISSING_TOKEN] for c in col]) \
-                for i, col in enumerate(zip(*self.data[1:]))]
-        meta = {k: v for k, v in self.features.items()}
+        data = self.data
+        headers, cols = [str(h) for h in data[0]], []
+        for col in (zip(*data[1:]) if len(data) > 1 else [[] for _ in headers]):
+            col = [None if c is None or c == MISSING_TOKEN else c for c in col]
+            try:
+                cols.append(pyarrow.array(col))
+            except (pyarrow.ArrowInvalid, pyarrow.ArrowTypeError):
+                # mixed types, e.g. strings and numbers ; fall back to strings
+                cols.append(pyarrow.array([None if c is None else str(c) for c in col]))
+        meta = {str(k): "" if v is None else str(v) for k, v in self.features.items()}
         meta['__metadata__'] = str(self.metadata).encode()
         schema_with_meta = pyarrow.schema(pyarrow.Table.from_arrays(cols, names=headers).schema, metadata=meta)
         return pyarrow.Table.from_arrays(cols, schema=schema_with_meta)
@@ -229,6 +278,7 @@ class DSFF:
         :param features: dictionary of features' names and descriptions OR path to features.json
         :param metadata: dictionary of dataset's metadata OR path to metadata.json
         """
+        self.__check_writable()
         # get the cell coordinate from (X,Y) coordinates (e.g. (1,2) => "B1")
         coord = lambda x, y: ws.cell(x+1, y+1).coordinate
         # private function to auto-adjust column widths
@@ -253,16 +303,18 @@ class DSFF:
         if data is not None:
             self.__logger.debug("writing data to DSFF...")
             ws, d = self.__wb['data'], data
-            if not isinstance(d, list):
+            if not isinstance(d, (list, tuple)):
                 if isfile(expanduser(d)) and splitext(d)[1] == ".csv":
                     with open(expanduser(d)) as f:
                         d = [r for r in csvmod.reader(f, delimiter=CSV_DELIMITER)]
                 else:
                     raise BadInputData("'data' is not a list")
+            # clear the worksheet so that no cell of previous data remains
+            ws.delete_rows(1, ws.max_row)
             for r, row in enumerate(d):
                 for c, value in enumerate(row):
                     c = coord(r, c)
-                    ws[c] = str({None: missing}.get(value, value))
+                    ws[c] = _to_cell(value, missing)
                     if r == 0:
                         ws[c].alignment = Alignment(horizontal="center")
                         ws[c].font = Font(bold=True)
@@ -278,6 +330,7 @@ class DSFF:
                         d = json.load(f)
                 else:
                     raise BadInputData("'features' is not a dictionary")
+            ws.delete_rows(1, ws.max_row)
             try:
                 for c, header in enumerate(headers):
                     c = coord(0, c)
@@ -326,7 +379,18 @@ class DSFF:
     
     @property
     def metadata(self):
-        return json.loads((self.__wb.properties.description or "{}").replace("'", "\""))
+        d = self.__wb.properties.description
+        if not d:
+            return {}
+        try:
+            return json.loads(d)
+        except ValueError:
+            pass
+        # older versions saved the representation of a Python dictionary
+        try:
+            return literal_eval(d)
+        except (SyntaxError, ValueError):
+            raise BadDsffFile("Metadata could not be parsed")
     
     @property
     def mode(self):

@@ -104,7 +104,7 @@ class TestDsff(TestCase):
                 self.assertRaises(BadInputData, f.from_arff, TEST_BASENAME)
         #  use a bad ARFF without the @RELATION line
         with _test():
-            d[0] = "@RELATION BAD:NO_QUOTE\n"
+            d[0] = "@RELATION 'BAD:UNTERMINATED_QUOTE\n"
             d.remove(d[1])
         #  use a bad ARFF without the @RELATION line
         with _test():

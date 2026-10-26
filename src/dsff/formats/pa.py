@@ -10,10 +10,13 @@ def _nowrite(m):
 
 
 def _parse(ds):
+    meta = dict(ds.schema.metadata or {})
+    # pop the metadata first so that it is not taken for a feature
+    metadata = literal_eval(meta.pop(b'__metadata__', b"{}").decode())
     return {
         'data': [ds.schema.names] + [list(r.values()) for r in ds.to_pylist()],
-        'features': {k.decode(): v.decode() for k, v in ds.schema.metadata.items()},
-        'metadata': literal_eval(ds.schema.metadata.pop(b'__metadata__', b"{}").decode()),
+        'features': {k.decode(): v.decode() for k, v in meta.items()},
+        'metadata': metadata,
     }
 
 

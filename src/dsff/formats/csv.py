@@ -7,14 +7,17 @@ __all__ = ["from_csv", "is_csv", "load_csv", "to_csv"]
 
 def from_csv(dsff, path=None, exclude=DEFAULT_EXCL, **kw):
     """ Populate the DSFF file from a CSV file. """
-    dsff.write(**load_csv(path))
+    dsff.write(**load_csv(path, exclude))
 
 
 @text_or_path
 def is_csv(text, **kw):
     """ Check if the input text or path is a valid CSV. """
     try:
-        dialect = csvmod.Sniffer().sniff(text := ensure_str(text))
+        # binary data (control characters other than whitespaces) is not a CSV
+        if re.search(r"[\x00-\x08\x0b\x0c\x0e-\x1f]", text := ensure_str(text)):
+            return False
+        dialect = csvmod.Sniffer().sniff(text)
         csvmod.Sniffer().has_header(text)
         return True
     except (csvmod.Error, UnicodeDecodeError):
@@ -26,7 +29,7 @@ def load_csv(path, exclude=DEFAULT_EXCL, **kw):
     data = {'metadata': {}}
     with open(expanduser(path)) as f:
         data['data'] = [r for r in csvmod.reader(f, delimiter=CSV_DELIMITER)]
-    data['features'] = {h: "" for h in data['data'][0] if h not in exclude}
+    data['features'] = {h: "" for h in data['data'][0] if h not in exclude and h != TARGET_NAME}
     return data
 
 
