@@ -27,7 +27,7 @@ def is_csv(text, **kw):
 def load_csv(path, exclude=DEFAULT_EXCL, **kw):
     """ Load a CSV file as a dictionary with data, features and metadata. """
     data = {'metadata': {}}
-    with open(expanduser(path)) as f:
+    with open(expanduser(path), newline='') as f:
         data['data'] = [r for r in csvmod.reader(f, delimiter=CSV_DELIMITER)]
     data['features'] = {h: "" for h in data['data'][0] if h not in exclude and h != TARGET_NAME}
     return data
@@ -35,7 +35,7 @@ def load_csv(path, exclude=DEFAULT_EXCL, **kw):
 
 def to_csv(dsff, path=None, text=False, **kw):
     """ Create a CSV from the data worksheet, saved as a file or output as a string. """
-    with (StringIO() if text else open(path, 'w+')) as f:
+    with (StringIO() if text else open(path, 'w+', newline='')) as f:
         writer = csvmod.writer(f, delimiter=";")
         for row in dsff.data:
             writer.writerow(row)

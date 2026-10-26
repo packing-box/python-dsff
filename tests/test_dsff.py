@@ -6,18 +6,7 @@
 from .utils import *
 
 
-class TestDsff(TestCase):
-    @classmethod
-    def tearDownClass(cls):
-        rmdir(TEST_BASENAME)
-        rmfile(TEST)
-        rmfile("undefined.dsff")
-        for ext in [".arff", ".csv", ".db"]:
-            rmfile(TEST_BASENAME + ext)
-    
-    def tearDown(self):
-        rmfile(TEST)
-    
+class TestDsff(DsffTestCase):
     def test_dsff_modes(self):
         # path not set, shall not work with 'r+?' or a bad mode
         self.assertRaises(ValueError, DSFF, None, "BAD_MODE")

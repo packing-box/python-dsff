@@ -4,7 +4,7 @@
 
 - Python **3.10 or later**. CI runs on 3.10 to 3.13.
 - [`openpyxl`](https://pypi.org/project/openpyxl/), which pip installs automatically.
-- Optionally, [`pyarrow`](https://arrow.apache.org/docs/python/index.html) (with [`pandas`](https://pypi.org/project/pandas/)) for the [Apache Arrow](https://arrow.apache.org/) formats.
+- Optionally, [`pyarrow`](https://arrow.apache.org/docs/python/index.html) for the [Apache Arrow](https://arrow.apache.org/) formats.
 
 ## From PyPI
 
@@ -46,7 +46,7 @@ $ pip install -e .
 '1.2.3'
 ```
 
-The `to_feather`, `to_orc` and `to_parquet` methods (and their `from_*` counterparts) only exist when `pyarrow` and `pandas` can be imported:
+The `to_feather`, `to_orc` and `to_parquet` methods (and their `from_*` counterparts) only exist when `pyarrow` can be imported:
 
 ```python
 >>> from dsff.formats import PYARROW

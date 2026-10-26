@@ -52,7 +52,7 @@ def to_dataset(dsff, path=None, **kw):
     makedirs(path, exist_ok=True)
     # handle data first
     dsff.logger.debug("> making data.csv...")
-    with open(join(path, "data.csv"), 'w+') as f:
+    with open(join(path, "data.csv"), 'w+', newline='') as f:
         writer = csvmod.writer(f, delimiter=";")
         for cells in dsff['data'].rows:
             writer.writerow([dsff._DSFF__eval(c.value) for c in cells])

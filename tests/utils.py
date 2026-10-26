@@ -2,6 +2,7 @@
 import hashlib
 import os
 import random
+import tempfile
 import zipfile
 from contextlib import contextmanager
 from datetime import datetime
@@ -16,6 +17,7 @@ TEST_NAME = "example-dataset"
 TEST = f".{TEST_NAME}.dsff"
 TEST_BASENAME = f".{TEST_NAME}"
 
+random.seed(42)  # reproducible test data
 TEST_DATA = [
     ["hash", "field1", "field2", "label"],
 ]
@@ -83,6 +85,17 @@ def rmfile(path):
         os.remove(path)
     except:
         pass
+
+
+class DsffTestCase(TestCase):
+    """ Test case running each test in its own temporary folder. """
+    def setUp(self):
+        self._cwd, self._tmp = os.getcwd(), tempfile.TemporaryDirectory()
+        os.chdir(self._tmp.name)
+    
+    def tearDown(self):
+        os.chdir(self._cwd)
+        self._tmp.cleanup()
 
 
 class Unserializable:

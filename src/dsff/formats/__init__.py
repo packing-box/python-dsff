@@ -305,7 +305,7 @@ class DSFF:
             ws, d = self.__wb['data'], data
             if not isinstance(d, (list, tuple)):
                 if isfile(expanduser(d)) and splitext(d)[1] == ".csv":
-                    with open(expanduser(d)) as f:
+                    with open(expanduser(d), newline='') as f:
                         d = [r for r in csvmod.reader(f, delimiter=CSV_DELIMITER)]
                 else:
                     raise BadInputData("'data' is not a list")
@@ -412,14 +412,14 @@ class DSFF:
         return p
     
     @staticmethod
-    @text_or_path
+    @text_or_path(folders=True)
     def format(text):
         for k, func in globals().items():
             if k.startswith("is_") and func(text):
                 return k.split("_", 1)[1]
     
     @staticmethod
-    @text_or_path
+    @text_or_path(folders=True)
     def is_valid_format(text):
         return DSFF.format(text) is not None
 

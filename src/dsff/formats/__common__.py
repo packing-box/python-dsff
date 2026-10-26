@@ -3,6 +3,7 @@ import csv as csvmod
 import json
 import re
 from ast import literal_eval
+from functools import wraps
 from io import BytesIO, StringIO
 from os import makedirs, remove
 from os.path import basename, exists, expanduser, isfile, isdir, join, splitext
@@ -11,7 +12,6 @@ try:  # pragma: no cover
     import pyarrow.feather as feather
     import pyarrow.orc as orc
     import pyarrow.parquet as parquet
-    import pandas
     PYARROW = True
 except ImportError:  # pragma: no cover
     PYARROW = False
@@ -21,7 +21,7 @@ __all__ = ["basename", "csvmod", "ensure_str", "exists", "expanduser", "isfile",
            "literal_eval", "makedirs", "re", "remove", "splitext", "text_or_path", "BytesIO", "StringIO",
            "CSV_DELIMITER", "DEFAULT_EXCL", "INMEMORY", "META_EXCL", "MISSING_TOKEN", "PYARROW", "TARGET_NAME"]
 if PYARROW:
-    __all__ += ["feather", "orc", "pandas", "parquet", "pyarrow"]
+    __all__ += ["feather", "orc", "parquet", "pyarrow"]
 
 
 CSV_DELIMITER = ";"
@@ -39,13 +39,20 @@ def ensure_str(string):
         return str(string)
 
 
-def text_or_path(f):
+def text_or_path(f=None, folders=False):
+    """ Decorate a function taking a text, bytes or a path, reading the file in the latter case. A folder is passed as
+         a path if folders is True, otherwise the function returns False (as no file content can be checked). """
+    if f is None:
+        return lambda f: text_or_path(f, folders)
+    @wraps(f)
     def _wrapper(txt_path, *args, **kwargs):
         if not isinstance(txt_path, bytes):
             if isinstance(txt_path, str):
                 # a string is a path if it points to an existing file or folder (a multiline string is a text)
                 if "\n" not in txt_path and exists(p := expanduser(txt_path)):
                     if isdir(p):
+                        if not folders:
+                            return False
                         txt_path = p
                     else:
                         with open(p, "rb") as fh:

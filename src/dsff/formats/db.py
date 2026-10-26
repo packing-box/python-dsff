@@ -49,7 +49,7 @@ def load_db(path, **kw):
         # list tables
         cursor.execute("SELECT name FROM sqlite_master WHERE type='table';")
         tables = [table[0] for table in cursor.fetchall()]
-        if not all(t in tables for t in ["data", "features", "metadata"]):  # pragma: no cover
+        if not all(t in tables for t in ["data", "features", "metadata"]):
             raise BadInputData("The target SQLDB does not have the right format")
         # import data
         cursor.execute("PRAGMA table_info('data')")

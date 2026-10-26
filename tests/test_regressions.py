@@ -4,7 +4,6 @@
 
 """
 import sqlite3
-import tempfile
 
 from .utils import *
 
@@ -13,15 +12,7 @@ DATA = [["hash", "a", "b", "label"], ["x", 1, 2.5, "upx"], ["y", 3, None, "?"]]
 FEATURES = {'a': "feature A", 'b': "feature B"}
 
 
-class TestRegressions(TestCase):
-    def setUp(self):
-        self._cwd, self._tmp = os.getcwd(), tempfile.TemporaryDirectory()
-        os.chdir(self._tmp.name)
-
-    def tearDown(self):
-        os.chdir(self._cwd)
-        self._tmp.cleanup()
-
+class TestRegressions(DsffTestCase):
     def test_metadata_values(self):
         # booleans, None and apostrophes in metadata shall not make the file unreadable
         with DSFF("test", 'w') as f:

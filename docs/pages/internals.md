@@ -34,7 +34,7 @@ Each format lives in a module of `dsff.formats` (`arff`, `csv`, `dataset`, `db` 
 - `from_<format>`: `load_<format>`, then `DSFF.write`;
 - `to_<format>`: write the DSFF in this format.
 
-When a `DSFF` is created, every `from_*` and `to_*` function is bound to the instance as a method. The wrapper fixes the target path (default name, extension) and, for `to_*`, refuses to convert an empty dataset. The Arrow functions are generated for Feather, ORC and Parquet, and are only defined when `pyarrow` and `pandas` can be imported.
+When a `DSFF` is created, every `from_*` and `to_*` function is bound to the instance as a method. The wrapper fixes the target path (default name, extension) and, for `to_*`, refuses to convert an empty dataset. The Arrow functions are generated for Feather, ORC and Parquet, and are only defined when `pyarrow` can be imported.
 
 | Format | Data | Features | Metadata |
 |:--|:-:|:-:|:-:|
@@ -42,6 +42,7 @@ When a `DSFF` is created, every `from_*` and `to_*` function is bound to the ins
 | CSV | yes | no (names only on import) | no |
 | SQLite (`db`), missing values as `NULL` | `data` table | `features` table | `metadata` table |
 | FilelessDataset | `data.csv` | `features.json` | `metadata.json` |
-| Feather, ORC, Parquet | table | schema metadata | schema metadata (`__metadata__`) |
+| Feather, Parquet | table | schema metadata | schema metadata (`__metadata__`) |
+| ORC | table | no (pyarrow does not write it) | no |
 
 When exporting to ARFF, the columns listed in `exclude` are dropped, the `label` column (if any) becomes the last attribute, a nominal one named `class`, and each other column becomes a `NUMERIC` attribute if all its values are numbers, a `STRING` one otherwise. String values are quoted, with backslash escapes. When importing, unquoted names, comments before `@RELATION` and quoted values are supported, and only the comments named after an attribute become feature descriptions.
