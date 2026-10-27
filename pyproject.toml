@@ -46,3 +46,22 @@ documentation = "https://python-dsff.readthedocs.io/en/latest/?badge=latest"
 homepage = "https://github.com/packing-box/python-dsff"
 issues = "https://github.com/packing-box/python-dsff/issues"
 repository = "https://github.com/packing-box/python-dsff"
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+
+[tool.coverage.run]
+cover_pylib = false
+source = ["dsff"]
+omit = [
+  "*/site-packages/*",
+  "tests/*",
+]
+
+[tool.coverage.report]
+exclude_lines = [
+  'pragma: no cover',
+  '''if\s+__name__\s+==\s+(?P<q>(?:[\'\"]))__main__(?P=q)\s+:''',
+  'raise NotImplementedError',
+  'except NotImplementedError:',
+]
